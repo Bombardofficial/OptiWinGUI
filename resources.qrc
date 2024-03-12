@@ -1,8 +1,5 @@
 <RCC>
     <qresource prefix="/">
-        <file>OptiWinLogo.ico</file>
-    </qresource>
-    <qresource prefix="/">
         <file>OptiWinLogo-transparent.png</file>
     </qresource>
     <qresource prefix="/">

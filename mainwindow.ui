@@ -103,7 +103,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>0</number>
+     <number>1</number>
     </property>
     <widget class="QWidget" name="page">
      <widget class="QPushButton" name="powersaverButton">
@@ -424,6 +424,16 @@
       </property>
       <property name="text">
        <string/>
+      </property>
+     </widget>
+     <widget class="QWidget" name="priorityGroup" native="true">
+      <property name="geometry">
+       <rect>
+        <x>320</x>
+        <y>360</y>
+        <width>291</width>
+        <height>141</height>
+       </rect>
       </property>
      </widget>
     </widget>

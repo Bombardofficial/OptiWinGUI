@@ -8,6 +8,10 @@
 #include "Processmanager.h"
 #include <QPropertyAnimation>
 #include <QPushButton>
+#include <QSystemTrayIcon>
+#include <QCloseEvent>
+#include <QSettings>
+#include <QCheckBox>
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -28,7 +32,7 @@ public:
     void updatePowerPlanLabel();
 signals:
     void startNormalModeSignal(); // Signal declaration
-    void startTurboModeSignal(); // Signal declaration
+    void startTurboModeSignal(bool enableDynamicOptimization); // Signal declaration
     void stopMonitoringSignal(); // Signal declaration
 private slots:
     void on_highPerformanceButton_clicked(); // Slot for button click
@@ -43,6 +47,7 @@ private slots:
     void refreshProcessList();
     void on_terminateProcessButton_clicked();
     void on_listProcessesButton_clicked();
+    void onOptInToggled(bool checked);
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -52,5 +57,10 @@ private:
     QThread* powerManagerThread; // Pointer to the QThread
     DisplayManager displayManager;
     bool monitoringActive;
+    QSystemTrayIcon *trayIcon; // System Tray Icon
+    void showTrayIcon();
+    void rememberUserChoice(bool dontAskAgain, bool runInBackground);
+    bool shouldAskBeforeExit();
+    QCheckBox *prioritycheckbox;
 };
 #endif // MAINWINDOW_H

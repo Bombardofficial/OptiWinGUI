@@ -47,7 +47,4 @@ RESOURCES += \
 
 DISTFILES += \
     OptiWinLogo-transparent.png \
-    OptiWinLogo-transparentmain.ico \
-    OptiWinLogo-transparentmain2.ico \
-    OptiWinLogo.ico \
-    OptiWinLogo.png
+    OptiWinLogo-transparentmain2.ico

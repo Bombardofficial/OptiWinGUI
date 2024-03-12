@@ -6,6 +6,7 @@
 #include <QThread>
 #include <QDateTime>
 #include <QPixmap>
+#include <QCheckBox>
 #include <QGraphicsDropShadowEffect>
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow),
@@ -17,6 +18,21 @@ MainWindow::MainWindow(QWidget *parent)
     ui->logoautomatic->setPixmap(pix); // Set the QPixmap to the label
     ui->logoautomatic->setScaledContents(true);
     ui->turboModeButton->setCheckable(true);
+
+
+    trayIcon = new QSystemTrayIcon(QIcon(":/OptiWinLogo-transparentmain2.ico"), this);
+    QMenu *trayMenu = new QMenu(this);
+    trayMenu->addAction("Open", this, &MainWindow::showNormal);
+    trayMenu->addAction("Quit", qApp, &QCoreApplication::quit);
+    trayIcon->setContextMenu(trayMenu);
+    connect(trayIcon, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason){
+        if (reason == QSystemTrayIcon::DoubleClick) {
+            this->showNormal();
+        }
+    });
+
+
+
     powerManager->moveToThread(powerManagerThread);
 
 
@@ -69,8 +85,23 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->normalModeButton, &QPushButton::clicked, this, &MainWindow::on_normalModeButton_clicked);
     connect(ui->turboModeButton, &QPushButton::clicked, this, &MainWindow::on_turboModeButton_clicked);
 
-}
+    connect(powerManager, &PowerManager::monitoringStarted, this, [this](){
+        monitoringActive = true;
+    });
 
+    connect(powerManager, &PowerManager::monitoringStopped, this, [this](){
+        monitoringActive = false;
+    });
+
+    prioritycheckbox = new QCheckBox(tr("Process Priority Optimization"), this);
+    if (!ui->priorityGroup->layout()) {
+        QVBoxLayout *layout = new QVBoxLayout; // Creating a new vertical layout
+        ui->priorityGroup->setLayout(layout); // Setting the layout to the widget
+    }
+    ui->priorityGroup->layout()->addWidget(prioritycheckbox);
+    connect(prioritycheckbox, &QCheckBox::toggled, this, &MainWindow::onOptInToggled);
+
+}
 
 MainWindow::~MainWindow() {
     if (powerManager) {
@@ -82,6 +113,68 @@ MainWindow::~MainWindow() {
     delete powerManager;
     delete ui;
 }
+
+// Check if the current process has administrator privileges
+bool hasAdminPrivileges() {
+    BOOL fIsRunAsAdmin = FALSE;
+    DWORD dwError = ERROR_SUCCESS;
+    PSID pAdministratorsGroup = NULL;
+
+    // Allocate and initialize a SID of the administrators group.
+    SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+    if (!AllocateAndInitializeSid(
+            &NtAuthority,
+            2,
+            SECURITY_BUILTIN_DOMAIN_RID,
+            DOMAIN_ALIAS_RID_ADMINS,
+            0, 0, 0, 0, 0, 0,
+            &pAdministratorsGroup)) {
+        dwError = GetLastError();
+        goto Cleanup;
+    }
+
+    // Determine whether the SID of administrators group is enabled in
+    // the primary access token of the process.
+    if (!CheckTokenMembership(NULL, pAdministratorsGroup, &fIsRunAsAdmin)) {
+        dwError = GetLastError();
+        goto Cleanup;
+    }
+
+Cleanup:
+    // Centralized cleanup for all allocated resources.
+    if (pAdministratorsGroup) {
+        FreeSid(pAdministratorsGroup);
+        pAdministratorsGroup = NULL;
+    }
+
+    // Throw the error if something failed in the function.
+    if (ERROR_SUCCESS != dwError) {
+        throw dwError;
+    }
+
+    return fIsRunAsAdmin == TRUE;
+}
+
+void MainWindow::onOptInToggled(bool checked) {
+    if (checked) {
+        try {
+            /*if (!hasAdminPrivileges()) {
+                QMessageBox::critical(this, "Administrator Privileges Required",
+                                      "For this function, you need to start OptiWin as an administrator.");
+                // Uncheck the box since we can't proceed without admin rights
+                prioritycheckbox->setChecked(false);
+                return;
+            }*/
+            QMessageBox::information(this, "Performance Optimization Enabled",
+                                     "Dynamic performance optimization is now enabled.");
+
+        } catch (DWORD dwError) {
+            QMessageBox::critical(this, "Error",
+                                  QString("An error occurred while checking administrator privileges: %1").arg(dwError));
+        }
+    }
+}
+
 
 void MainWindow::updateRefreshRateLabel() {
     int currentRefreshRate = displayManager.getCurrentRefreshRate();
@@ -132,10 +225,55 @@ void MainWindow::on_brightnessSlider_valueChanged(int value) {
     SetExternalMonitorBrightness(value);
 }
 void MainWindow::closeEvent(QCloseEvent *event) {
+    if(monitoringActive) {
+        qDebug() << "monitoringActive: true";
+    }
+    if(shouldAskBeforeExit()) {
+        qDebug() << "shouldAskBeforeExit: true";
+    }
+
+    if (monitoringActive && shouldAskBeforeExit()) {
+        QMessageBox msgBox;
+        msgBox.setText(tr("Do you want to keep the application running in the background?"));
+        msgBox.setInformativeText(tr("Your monitoring settings will be active."));
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        msgBox.setDefaultButton(QMessageBox::Yes);
+        QCheckBox dontAskAgainBox(tr("Don't ask me again"));
+        msgBox.setCheckBox(&dontAskAgainBox);
+
+        int ret = msgBox.exec();
+        rememberUserChoice(dontAskAgainBox.isChecked(), ret == QMessageBox::Yes);
+
+        if (ret == QMessageBox::Yes) {
+            event->ignore();
+            this->hide();
+            if (!trayIcon->isVisible()) {
+                trayIcon->show();
+            }
+            return;
+        }
+    }
     if (powerManager) {
         powerManager->cleanup(); // Directly call cleanup
     }
     QMainWindow::closeEvent(event); // Call the base class implementation
+}
+
+void MainWindow::showTrayIcon() {
+    if (!trayIcon->isVisible()) {
+        trayIcon->show();
+    }
+}
+
+void MainWindow::rememberUserChoice(bool dontAskAgain, bool runInBackground) {
+    QSettings settings;
+    settings.setValue("dontAskBeforeExit", dontAskAgain);
+    settings.setValue("runInBackground", runInBackground);
+}
+
+bool MainWindow::shouldAskBeforeExit() {
+    QSettings settings;
+    return !settings.value("dontAskBeforeExit", false).toBool();
 }
 
 void MainWindow::updateMonitoringButtonStyle(QPushButton* button, bool monitoringActive) {
@@ -195,17 +333,35 @@ void MainWindow::on_turboModeButton_clicked() {
 
     lastClickTime = now;
     qDebug() << "Turbo Mode Button Clicked. Current state:" << monitoringActive;
-    if (ui->turboModeButton->isChecked()) {
-        emit startTurboModeSignal();
-        logMessageAutomatic("Turbo (Performance) Mode Activated.");
-        ui->turboModeButton->setStyleSheet("QPushButton { border: 2px solid green; }");
-    } else {
+
+
+
+    bool isChecked = ui->turboModeButton->isChecked();
+
+    if (isChecked && !monitoringActive) {
+        // Start monitoring
+        if(prioritycheckbox->isChecked()){
+            qDebug() << "prioritycheckbox CHECKED";
+        }
+
+        emit startTurboModeSignal(prioritycheckbox->isChecked());
+        logMessageAutomatic("Turbo Mode Activated.");
+        ui->turboModeButton->setStyleSheet("QPushButton { border: 4px solid green; }");
+        monitoringActive = true; // Ensure the monitoringActive state is correctly updated
+    } else if (!isChecked && monitoringActive) {
+        // Stop monitoring
         emit stopMonitoringSignal();
         logMessageAutomatic("Monitoring stopped.");
         ui->turboModeButton->setStyleSheet(""); // Reset to default style
+        monitoringActive = false; // Ensure the monitoringActive state is correctly updated
     }
-    qDebug() << "Turbo Mode Button Processed. New state:" << monitoringActive;
-    updatePowerPlanLabel();
+
+    // No change in monitoring state, just update the visual style based on the button's check state
+    else {
+        ui->turboModeButton->setStyleSheet(isChecked ? "QPushButton { border: 4px solid green; }" : "");
+    }
+
+    updatePowerPlanLabel(); // Ensure the power plan label is updated accordingly
 }
 
 
