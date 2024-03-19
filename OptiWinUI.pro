@@ -11,6 +11,7 @@ CONFIG += c++17
 SOURCES += \
     Application.cpp \
     Displaymanager.cpp \
+    PowerMonitoringManager.cpp \
     Powermanager.cpp \
     Processmanager.cpp \
     brightness_control.cpp \
@@ -20,6 +21,7 @@ SOURCES += \
 HEADERS += \
     Application.h \
     Displaymanager.h \
+    PowerMonitoringManager.h \
     Powermanager.h \
     Processmanager.h \
     brightness_control.h \

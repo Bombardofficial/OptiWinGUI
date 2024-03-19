@@ -436,6 +436,42 @@
        </rect>
       </property>
      </widget>
+     <widget class="QPushButton" name="startButton">
+      <property name="geometry">
+       <rect>
+        <x>1080</x>
+        <y>370</y>
+        <width>131</width>
+        <height>41</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>PushButton</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="durationComboBox">
+      <property name="geometry">
+       <rect>
+        <x>1080</x>
+        <y>430</y>
+        <width>131</width>
+        <height>28</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="statusLabel">
+      <property name="geometry">
+       <rect>
+        <x>1050</x>
+        <y>480</y>
+        <width>181</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
     </widget>
    </widget>
   </widget>

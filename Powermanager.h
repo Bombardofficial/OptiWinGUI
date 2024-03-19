@@ -30,19 +30,23 @@ public:
     QString removeAccents(const QString &input);
     void restorePriorities();
     DWORD defaultbrightness;
+    bool isOnBatteryPower();
 signals:
     void logMessageAutomatic(QString message);
     void monitoringStarted();
     void monitoringStopped();
     void requestPriorityAdjustment(DWORD processID, DWORD newPriorityClass);
+    void powerSourceChangedToAC();
 
 public slots:
-    void startNormalModeSlot();
+    void startNormalModeSlot(bool enableDynamicOptimization);
     void startTurboModeSlot(bool enableDynamicOptimization);
     void stopMonitoringSlot();
     void cleanup();
     void adjustPrioritySlot(DWORD processID, DWORD newPriorityClass);
     void checkAndAdjustProcessPriorities();
+
+    void checkAndAdjustProcessPrioritiesforBattery();
 
 private:
     ULARGE_INTEGER lastCPU, lastSysCPU, lastUserCPU;
@@ -74,6 +78,7 @@ private:
     bool isHighResourceUsage(DWORD processID);
     QString priorityToString(DWORD priorityClass);
     DWORD determinePriorityBasedOnUsage(SIZE_T memoryUsageMB, double cpuUsagePercent);
+    bool dynamicOptimizationEnabled;
 };
 
 #endif // POWERMANAGER_H

@@ -8,9 +8,10 @@
 #include <QPixmap>
 #include <QCheckBox>
 #include <QGraphicsDropShadowEffect>
+#include <QDebug>
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow),
-    powerManager(new PowerManager()), powerManagerThread(new QThread(this)), monitoringActive(false) {
+    powerManager(new PowerManager()), powerManagerThread(new QThread(this)), monitoringActive(false), powerMonitoringManager(new PowerMonitoringManager(this)) {
     ui->setupUi(this);
     QPixmap pix(":/OptiWinLogo-transparent.png"); // Load the image
     ui->logomanual->setPixmap(pix); // Set the QPixmap to the label
@@ -18,6 +19,24 @@ MainWindow::MainWindow(QWidget *parent)
     ui->logoautomatic->setPixmap(pix); // Set the QPixmap to the label
     ui->logoautomatic->setScaledContents(true);
     ui->turboModeButton->setCheckable(true);
+
+
+    connect(ui->startButton, &QPushButton::clicked, this, [this]() {
+        int duration = ui->durationComboBox->currentText().toInt(); // Convert duration to integer
+        powerMonitoringManager->startMonitoring(duration);
+    });
+
+    connect(powerMonitoringManager, &PowerMonitoringManager::logMessage, this, &MainWindow::logMessage);
+    connect(powerMonitoringManager, &PowerMonitoringManager::monitoringStarted, this, [this]() {
+        ui->statusLabel->setText("Monitoring started...");
+        ui->startButton->setEnabled(false); // Optionally disable start button
+    });
+    connect(powerMonitoringManager, &PowerMonitoringManager::monitoringStopped, this, [this]() {
+        ui->statusLabel->setText("Monitoring stopped.");
+        ui->startButton->setEnabled(true); // Re-enable start button
+    });
+
+
 
 
     trayIcon = new QSystemTrayIcon(QIcon(":/OptiWinLogo-transparentmain2.ico"), this);
@@ -57,7 +76,7 @@ MainWindow::MainWindow(QWidget *parent)
         powerManager->defaultbrightness = currentBrightness;
     }
 
-
+    connect(powerManager, &PowerManager::powerSourceChangedToAC, this, &MainWindow::powerSourceChangedToAC);
     // Display the current refresh rate
     int currentRefreshRate = displayManager.getCurrentRefreshRate(); // Ensure DisplayManager is properly initialized and accessible
     ui->refreshRateLabel->setText("Current refresh rate is: "+ QString::number(currentRefreshRate) + " Hz"); // Assuming you have a label named refreshRateLabel
@@ -102,6 +121,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(prioritycheckbox, &QCheckBox::toggled, this, &MainWindow::onOptInToggled);
 
 }
+
 
 MainWindow::~MainWindow() {
     if (powerManager) {
@@ -165,8 +185,8 @@ void MainWindow::onOptInToggled(bool checked) {
                 prioritycheckbox->setChecked(false);
                 return;
             }*/
-            QMessageBox::information(this, "Performance Optimization Enabled",
-                                     "Dynamic performance optimization is now enabled.");
+            QMessageBox::information(this, "Dynamic Priority Optimization Enabled",
+                                     "Dynamic piority optimization is now enabled.");
 
         } catch (DWORD dwError) {
             QMessageBox::critical(this, "Error",
@@ -309,17 +329,46 @@ void MainWindow::on_normalModeButton_clicked() {
     }
 
     lastClickTime = now;
-    qDebug() << "Turbo Mode Button Clicked. Current state:" << monitoringActive;
-    if (ui->normalModeButton->isChecked()) {
-        emit startNormalModeSignal();
-        logMessageAutomatic("Normal (Battery life) Mode Activated.");
-        ui->normalModeButton->setStyleSheet("QPushButton { border: 2px solid green; }");
-    } else {
+    qDebug() << "Normal Mode Button Clicked. Current state:" << monitoringActive;
+
+    bool isChecked = ui->normalModeButton->isChecked();
+
+
+    if (isChecked && !monitoringActive) {
+
+
+        // Start monitoring
+        if(prioritycheckbox->isChecked()){
+            qDebug() << "prioritycheckbox CHECKED";
+        }
+        bool enableDynamicOptimization = prioritycheckbox->isChecked();
+
+        if (powerManager->isOnBatteryPower() || !enableDynamicOptimization) {
+            emit startNormalModeSignal(enableDynamicOptimization);
+            logMessageAutomatic("Normal Mode Monitoring started.");
+            ui->normalModeButton->setStyleSheet("QPushButton { border:4px solid green; }");
+            monitoringActive = true;
+            prioritycheckbox->setEnabled(false); // Disable checkbox once monitoring starts.
+        } else {
+            // Notify the user that monitoring cannot start due to not meeting the conditions.
+            QMessageBox::warning(this, "Cannot Start Monitoring",
+                                 "Monitoring can only start when plugged in without priority optimization or on battery power.");
+        }
+    } else if (!isChecked && monitoringActive) {
+        prioritycheckbox->setEnabled(true);
+        // Stop monitoring
         emit stopMonitoringSignal();
         logMessageAutomatic("Monitoring stopped.");
         ui->normalModeButton->setStyleSheet(""); // Reset to default style
+        monitoringActive = false; // Ensure the monitoringActive state is correctly updated
     }
-    updatePowerPlanLabel();
+
+    // No change in monitoring state, just update the visual style based on the button's check state
+    else {
+        ui->normalModeButton->setStyleSheet(isChecked ? "QPushButton { border: 4px solid green; }" : "");
+    }
+
+    updatePowerPlanLabel(); // Ensure the power plan label is updated accordingly
 }
 
 void MainWindow::on_turboModeButton_clicked() {
@@ -339,6 +388,7 @@ void MainWindow::on_turboModeButton_clicked() {
     bool isChecked = ui->turboModeButton->isChecked();
 
     if (isChecked && !monitoringActive) {
+        prioritycheckbox->setEnabled(false);
         // Start monitoring
         if(prioritycheckbox->isChecked()){
             qDebug() << "prioritycheckbox CHECKED";
@@ -349,6 +399,7 @@ void MainWindow::on_turboModeButton_clicked() {
         ui->turboModeButton->setStyleSheet("QPushButton { border: 4px solid green; }");
         monitoringActive = true; // Ensure the monitoringActive state is correctly updated
     } else if (!isChecked && monitoringActive) {
+        prioritycheckbox->setEnabled(true);
         // Stop monitoring
         emit stopMonitoringSignal();
         logMessageAutomatic("Monitoring stopped.");
@@ -364,7 +415,19 @@ void MainWindow::on_turboModeButton_clicked() {
     updatePowerPlanLabel(); // Ensure the power plan label is updated accordingly
 }
 
-
+// Define the slot in MainWindow:
+void MainWindow::powerSourceChangedToAC() {
+    if (!acPowerSourceChangeHandled) {
+        QMessageBox::warning(this, tr("Power Source Changed"),
+                             tr("Monitoring has been stopped because the power source changed to AC power."));
+        emit stopMonitoringSignal(); // Stop monitoring
+        acPowerSourceChangeHandled = true; // Ensure this block runs only once per AC connection event
+        logMessageAutomatic("Monitoring stopped.");
+        ui->normalModeButton->setStyleSheet(""); // Reset to default style
+        monitoringActive = false; // Ensure the monitoringActive state is correctly updated
+        prioritycheckbox->setEnabled(true);
+    }
+}
 
 void MainWindow::on_manualButton_clicked() {
     ui->stackedWidget->setCurrentIndex(0); // Index 0 for Manual mode page

@@ -5,6 +5,7 @@
 #include "PowerManager.h"
 #include "DisplayManager.h"
 #include "brightness_control.h"
+#include "PowerMonitoringManager.h"
 #include "Processmanager.h"
 #include <QPropertyAnimation>
 #include <QPushButton>
@@ -31,7 +32,7 @@ public:
     void updateRefreshRateLabel();
     void updatePowerPlanLabel();
 signals:
-    void startNormalModeSignal(); // Signal declaration
+    void startNormalModeSignal(bool enableDynamicOptimization); // Signal declaration
     void startTurboModeSignal(bool enableDynamicOptimization); // Signal declaration
     void stopMonitoringSignal(); // Signal declaration
 private slots:
@@ -48,6 +49,7 @@ private slots:
     void on_terminateProcessButton_clicked();
     void on_listProcessesButton_clicked();
     void onOptInToggled(bool checked);
+    void powerSourceChangedToAC();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -62,5 +64,7 @@ private:
     void rememberUserChoice(bool dontAskAgain, bool runInBackground);
     bool shouldAskBeforeExit();
     QCheckBox *prioritycheckbox;
+    PowerMonitoringManager* powerMonitoringManager;
+    bool acPowerSourceChangeHandled = false;
 };
 #endif // MAINWINDOW_H

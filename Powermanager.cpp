@@ -15,7 +15,7 @@ std::mutex consoleMutex;
 
 PowerManager::PowerManager(QObject *parent)
     : QObject(parent), isTurboMode(false), checkTimer(new QTimer(this)), checkPriorityTimer(new QTimer(this)), menuDisplayed(false),
-    currentPowerPlan(""), idleThreshold(180000), accumulatedIdleTime(0), checkInterval(3000), checkPriorityInterval(6000),powerSaverName("Power saver"),highPerformanceName("High performance"), balancedName("Balanced"), monitoringActive(false) {
+    currentPowerPlan(""), idleThreshold(180000), accumulatedIdleTime(0), checkInterval(3000), checkPriorityInterval(60000),powerSaverName("Power saver"),highPerformanceName("High performance"), balancedName("Balanced"), monitoringActive(false) {
 
     connect(checkTimer, &QTimer::timeout, this, &PowerManager::checkIdleAndSwitchPlan);
     connect(checkPriorityTimer, &QTimer::timeout, this, &PowerManager::checkAndAdjustProcessPriorities); // Additional connection for resource check
@@ -200,6 +200,12 @@ void PowerManager::switchPowerPlan(const std::string& powerPlanName) {
 }
 
 bool PowerManager::isSystemIdle() {
+
+    if (!isOnBatteryPower() && isTurboMode == false && monitoringActive && dynamicOptimizationEnabled) { // Assuming dynamicOptimizationEnabled is a flag indicating if dynamic optimization was enabled
+        // If we've switched from battery to AC power, emit a signal to stop monitoring
+        emit powerSourceChangedToAC(); // You need to define this signal in your PowerManager class
+        return false; // Return false to avoid further processing in this call
+    }
     LASTINPUTINFO lastInputInfo;
     lastInputInfo.cbSize = sizeof(LASTINPUTINFO);
     GetLastInputInfo(&lastInputInfo);
@@ -222,20 +228,29 @@ void PowerManager::setMenuDisplayed(bool displayed) {
     menuDisplayed = displayed;
 }
 
-void PowerManager::startNormalModeSlot() {
+void PowerManager::startNormalModeSlot(bool enableDynamicOptimization) {
     isTurboMode = false;
+    dynamicOptimizationEnabled = enableDynamicOptimization;
     SetExternalMonitorBrightness(defaultbrightness);
-    qDebug() << "Starting Normal Mode Monitoring";
     if (!monitoringActive) {
         monitoringActive = true;
+        if (enableDynamicOptimization) {
+            qDebug() << "[Normal Mode] Starting with Dynamic Optimization:" << enableDynamicOptimization;
+            if (isOnBatteryPower()) {
+                checkAndAdjustProcessPrioritiesforBattery();
+                checkPriorityTimer->start(checkPriorityInterval);
+            }
+
+        }
         checkTimer->start(checkInterval);
-        qDebug() << "Normal Mode Monitoring Active";
+        qDebug() << "Normal Mode Monitoring Active with Dynamic Optimization: " << enableDynamicOptimization;
+        emit monitoringStarted();
     }
-    emit monitoringStarted();
 }
 
 void PowerManager::startTurboModeSlot(bool enableDynamicOptimization) {
     isTurboMode = true;
+    dynamicOptimizationEnabled = enableDynamicOptimization;
     SetExternalMonitorBrightness(defaultbrightness); // Example brightness adjustment for Turbo Mode
 
     if (!monitoringActive) {
@@ -250,6 +265,69 @@ void PowerManager::startTurboModeSlot(bool enableDynamicOptimization) {
         emit monitoringStarted();
     }
 
+}
+bool PowerManager::isOnBatteryPower() {
+    SYSTEM_POWER_STATUS sps;
+    if (GetSystemPowerStatus(&sps)) {
+        return sps.ACLineStatus == 0; // 0 means running on battery, 1 means plugged in
+    }
+    return false; // Default to false if unable to get power status
+}
+
+void PowerManager::checkAndAdjustProcessPrioritiesforBattery() {
+    aggregatedCpuUsageMap.clear(); // Clear previous data
+    aggregatedMemoryUsageMap.clear(); // Clear previous data
+    DWORD processes[1024], bytesNeeded, processesCount;
+    if (!EnumProcesses(processes, sizeof(processes), &bytesNeeded)) {
+        qDebug() << "Failed to enumerate processes for battery life optimization.";
+        return;
+    }
+
+    processesCount = bytesNeeded / sizeof(DWORD);
+    QMap<QString, QList<DWORD>> executableProcesses;
+
+    for (unsigned int i = 0; i < processesCount; i++) {
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processes[i]);
+        if (!hProcess) continue;
+
+        TCHAR processPath[MAX_PATH] = TEXT("<unknown>");
+        GetModuleFileNameEx(hProcess, NULL, processPath, sizeof(processPath) / sizeof(TCHAR));
+        QString executableName = QString::fromWCharArray(processPath).split("\\").last();
+
+        double cpuUsage = getProcessCpuUsage(hProcess, processes[i]);
+        QString executablePath = QString::fromWCharArray(processPath);
+        if (executablePath.startsWith("C:\\Windows\\System32", Qt::CaseInsensitive) ||
+            (executablePath.startsWith("C:\\Windows\\", Qt::CaseInsensitive) && !executablePath.contains("\\Windows\\SystemApps\\"))) {
+            // This is likely a system process, skip adjustments
+            continue;
+        }
+        aggregatedCpuUsageMap[executableName] += cpuUsage;
+
+        PROCESS_MEMORY_COUNTERS pmc;
+        if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
+            aggregatedMemoryUsageMap[executableName] += pmc.WorkingSetSize / (1024 * 1024); // Convert to MB
+        }
+
+        executableProcesses[executableName].append(processes[i]);
+
+        CloseHandle(hProcess);
+    }
+
+    for (auto it = executableProcesses.begin(); it != executableProcesses.end(); ++it) {
+        const QString &exeName = it.key();
+        const QList<DWORD> &processIds = it.value();
+
+        double totalCpuUsage = aggregatedCpuUsageMap[exeName];
+        SIZE_T totalMemoryUsage = aggregatedMemoryUsageMap[exeName];
+        DWORD newPriority = determinePriorityBasedOnUsage(totalMemoryUsage, totalCpuUsage);
+
+        qDebug() << "Executable: " << exeName << " | Total CPU Usage: " << totalCpuUsage
+                 << "% | Total Memory Usage: " << totalMemoryUsage << "MB | New Priority: " << priorityToString(newPriority);
+
+        for (DWORD processID : processIds) {
+            adjustPrioritySlot(processID, newPriority);
+        }
+    }
 }
 
 void PowerManager::checkAndAdjustProcessPriorities() {
@@ -312,13 +390,25 @@ void PowerManager::checkAndAdjustProcessPriorities() {
 
 // Helper function to determine the new priority based on memory usage and current priority
 DWORD PowerManager::determinePriorityBasedOnUsage(SIZE_T memoryUsageMB, double cpuUsagePercent) {
-    // Example logic: adjust these thresholds based on your needs
-    if (cpuUsagePercent > 20 || memoryUsageMB > 2000) {
-        return ABOVE_NORMAL_PRIORITY_CLASS;
-    } else if (cpuUsagePercent > 50 || memoryUsageMB > 4000) {
-        return HIGH_PRIORITY_CLASS;
-    } else {
-        return NORMAL_PRIORITY_CLASS;
+
+    if(!isOnBatteryPower()){
+        // Example logic: adjust these thresholds based on your needs
+        if (cpuUsagePercent > 20 || memoryUsageMB > 2000) {
+            return ABOVE_NORMAL_PRIORITY_CLASS;
+        } else if (cpuUsagePercent > 50 || memoryUsageMB > 4000) {
+            return HIGH_PRIORITY_CLASS;
+        } else {
+            return NORMAL_PRIORITY_CLASS;
+        }
+    }
+    else {
+        if (cpuUsagePercent < 10 || memoryUsageMB < 1000) {
+            return BELOW_NORMAL_PRIORITY_CLASS;
+        } else if (cpuUsagePercent > 20 || memoryUsageMB > 2000) {
+            return NORMAL_PRIORITY_CLASS;
+        } else {
+            return NORMAL_PRIORITY_CLASS;
+        }
     }
 }
 
@@ -375,12 +465,13 @@ void PowerManager::stopMonitoringSlot() {
         if (checkPriorityTimer->isActive()) {
             checkPriorityTimer->stop();
             qDebug() << "Priority optimization stopped.";
+
+            restorePriorities(); // Restore the original priorities of any adjusted processes
         }
 
         monitoringActive = false;
         SetExternalMonitorBrightness(defaultbrightness); // Reset brightness to default
         qDebug() << "Monitoring Stopped";
-        restorePriorities(); // Restore the original priorities of any adjusted processes
     }
 
     emit monitoringStopped();
