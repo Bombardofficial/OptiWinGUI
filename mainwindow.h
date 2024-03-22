@@ -16,7 +16,13 @@
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
+enum class Mode {
+    Normal,
+    Turbo,
+    Dynamic
+};
 
+extern Mode currentMode;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -50,7 +56,7 @@ private slots:
     void on_listProcessesButton_clicked();
     void onOptInToggled(bool checked);
     void powerSourceChangedToAC();
-
+    void on_dynamicModeButton_clicked();
 protected:
     void closeEvent(QCloseEvent *event) override;
 private:
@@ -66,5 +72,6 @@ private:
     QCheckBox *prioritycheckbox;
     PowerMonitoringManager* powerMonitoringManager;
     bool acPowerSourceChangeHandled = false;
+    void updateButtonStyles();
 };
 #endif // MAINWINDOW_H

@@ -10,6 +10,7 @@
 #include <psapi.h>
 #include <QMap>
 #include <QMultiMap>
+#include "mainwindow.h"
 //priority 120000
 std::mutex consoleMutex;
 
@@ -167,6 +168,7 @@ void PowerManager::switchPowerPlan(const std::string& powerPlanName) {
     if (currentPowerPlan == powerPlanName) {
         return; // No need to switch if it's already the selected plan
     }
+    lastPowerPlan = currentPowerPlan;
     std::string command;
     if (powerPlanName == "Balanced") {
         command = "powercfg /s SCHEME_BALANCED";
@@ -390,6 +392,7 @@ void PowerManager::checkAndAdjustProcessPriorities() {
 
 // Helper function to determine the new priority based on memory usage and current priority
 DWORD PowerManager::determinePriorityBasedOnUsage(SIZE_T memoryUsageMB, double cpuUsagePercent) {
+    bool isIdle = isSystemIdle();
 
     if(!isOnBatteryPower()){
         // Example logic: adjust these thresholds based on your needs
@@ -400,6 +403,9 @@ DWORD PowerManager::determinePriorityBasedOnUsage(SIZE_T memoryUsageMB, double c
         } else {
             return NORMAL_PRIORITY_CLASS;
         }
+    }
+    else if(isIdle) {
+        return BELOW_NORMAL_PRIORITY_CLASS;
     }
     else {
         if (cpuUsagePercent < 10 || memoryUsageMB < 1000) {
@@ -482,24 +488,42 @@ void PowerManager::checkIdleAndSwitchPlan() {
 
     bool isIdle = isSystemIdle();
     qDebug() << "System Idle Status:" << isIdle << ", Current Power Plan:" << QString::fromStdString(currentPowerPlan);
-
-    if (isIdle) {
-        if (currentPowerPlan != powerSaverName) {
+    std::string previousPowerPlan = currentPowerPlan;
+    if (isOnBatteryPower()) {
+        if ((currentMode == Mode::Dynamic || currentMode == Mode::Normal) && !isIdle) {
+            switchPowerPlan(balancedName);
+            SetExternalMonitorBrightness(defaultbrightness);
+        } else if (isIdle) {
             qDebug() << "Switching to Power Saver due to idle status.";
             switchPowerPlan(powerSaverName);
             SetExternalMonitorBrightness(30);
         }
-    } else {
-        // Determine the correct target plan based on the mode
-        std::string targetPlan = isTurboMode ? highPerformanceName : balancedName;
-
-
-        if (currentPowerPlan != targetPlan) {
-            qDebug() << "System is active. Switching to" << QString::fromStdString(targetPlan);
-            switchPowerPlan(targetPlan);
+    } else { // Not on battery power
+        if (currentMode == Mode::Dynamic || currentMode == Mode::Turbo) {
+            switchPowerPlan(highPerformanceName);
             SetExternalMonitorBrightness(defaultbrightness);
         }
     }
+    if ((previousPowerPlan == highPerformanceName && currentPowerPlan == balancedName) ||
+        (previousPowerPlan == balancedName && currentPowerPlan == highPerformanceName)) {
+        qDebug() << "Power plan switched. Adjusting process priorities.";
+        checkAndAdjustProcessPriorities();
+    }
+}
+
+void PowerManager::startMonitoringBasedOnPowerSource() {
+    if (isOnBatteryPower()) {
+        // If on battery, start monitoring with normal mode
+        startNormalModeSlot(dynamicOptimizationEnabled);
+    } else {
+        // If plugged in, start monitoring with turbo mode
+        startTurboModeSlot(dynamicOptimizationEnabled);
+    }
+}
+
+void PowerManager::stopMonitoringAndRestart() {
+    stopMonitoringSlot(); // Stop current monitoring
+    startMonitoringBasedOnPowerSource(); // Start monitoring with the correct settings based on power source
 }
 
 void PowerManager::restorePriorities() {

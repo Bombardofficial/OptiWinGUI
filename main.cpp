@@ -10,6 +10,24 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
     a.setWindowIcon(QIcon("./OptiWinLogo-transparentmain2.ico"));
     QString stylesheet = R"(
+
+QPushButton#dynamicModeButton {
+    background-color: white;
+    color: red; /* Text color, change it as needed */
+    border: 5px solid #eb1313;
+    border-radius: 50%; /* This will help to make the button rounded */
+    min-width: 100px;
+    max-width: 100px;
+    min-height: 100px;
+    max-height: 100px; /* Adjust width and height equally to get a perfect circle */
+    font: bold 14pt; /* Optional: Adjust font as needed */
+}
+QPushButton#dynamicModeButton:hover {
+    background-color: #f2f2f2; /* Lighter grey for hover effect, adjust as needed */
+}
+QPushButton#dynamicModeButton:pressed {
+    background-color: #e6e6e6; /* Even lighter grey for pressed effect, adjust as needed */
+}
 QWidget {
     background-color: #ced9dc;
     color: #333;
@@ -29,10 +47,10 @@ QPushButton {
     padding: 10px 25px;
     font: bold 14pt "Segoe UI";
     text-transform: uppercase;
-    /* Button Shadow */
-    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1); /* subtle shadow for buttons */
 }
-
+QPushButton#turboModeButton, QPushButton#normalModeButton {
+    font: bold 10pt "Segoe UI"; /* Smaller font size */
+}
 QPushButton:hover {
     background-color: #bc070d;
 }
@@ -52,8 +70,6 @@ QComboBox, QTextEdit, QListWidget {
     background-color: #ffffff; /* white background for editable widgets */
     color: #333;
     padding: 5px;
-    /* Widget Shadow */
-    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 QMenuBar {
@@ -106,11 +122,6 @@ QSlider::handle:horizontal {
     width: 18px;
     margin: -2px 0; /* handle is placed by default on the contents rect of the groove. Expand outside the groove */
     border-radius: 3px;
-}
-
-/* Apply the shadow effect to all items that should have it */
-QLabel, QFrame, QTabWidget, QGroupBox {
-    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* If you're using a QGraphicsDropShadowEffect, apply it to the necessary widgets in your mainwindow setup code */

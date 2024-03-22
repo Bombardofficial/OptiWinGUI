@@ -6,6 +6,7 @@
 #include <string>
 #include "DisplayManager.h" // Ensure this is defined elsewhere in your project
 #include "brightness_control.h"
+
 #include <map>
 #include <windows.h>
 
@@ -31,12 +32,15 @@ public:
     void restorePriorities();
     DWORD defaultbrightness;
     bool isOnBatteryPower();
+    void startMonitoringBasedOnPowerSource();
+    void stopMonitoringAndRestart();
 signals:
     void logMessageAutomatic(QString message);
     void monitoringStarted();
     void monitoringStopped();
     void requestPriorityAdjustment(DWORD processID, DWORD newPriorityClass);
     void powerSourceChangedToAC();
+
 
 public slots:
     void startNormalModeSlot(bool enableDynamicOptimization);
@@ -54,7 +58,7 @@ private:
     HANDLE self;
     std::unordered_map<QString, double> aggregatedCpuUsageMap;
     std::unordered_map<QString, SIZE_T> aggregatedMemoryUsageMap;
-
+    std::string lastPowerPlan;
     void initCpuUsage();
     double getProcessCpuUsage(HANDLE process, DWORD processID);
     std::map<DWORD, ProcessCpuTimes> processCpuTimesMap;

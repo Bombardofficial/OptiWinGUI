@@ -9,6 +9,8 @@
 #include <QCheckBox>
 #include <QGraphicsDropShadowEffect>
 #include <QDebug>
+
+Mode currentMode = Mode::Dynamic;
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow),
     powerManager(new PowerManager()), powerManagerThread(new QThread(this)), monitoringActive(false), powerMonitoringManager(new PowerMonitoringManager(this)) {
@@ -21,22 +23,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->turboModeButton->setCheckable(true);
 
 
-    connect(ui->startButton, &QPushButton::clicked, this, [this]() {
-        int duration = ui->durationComboBox->currentText().toInt(); // Convert duration to integer
-        powerMonitoringManager->startMonitoring(duration);
-    });
 
-    connect(powerMonitoringManager, &PowerMonitoringManager::logMessage, this, &MainWindow::logMessage);
-    connect(powerMonitoringManager, &PowerMonitoringManager::monitoringStarted, this, [this]() {
-        ui->statusLabel->setText("Monitoring started...");
-        ui->startButton->setEnabled(false); // Optionally disable start button
-    });
-    connect(powerMonitoringManager, &PowerMonitoringManager::monitoringStopped, this, [this]() {
-        ui->statusLabel->setText("Monitoring stopped.");
-        ui->startButton->setEnabled(true); // Re-enable start button
-    });
-
-
+    connect(ui->dynamicModeButton, &QPushButton::clicked, this, &MainWindow::on_dynamicModeButton_clicked);
 
 
     trayIcon = new QSystemTrayIcon(QIcon(":/OptiWinLogo-transparentmain2.ico"), this);
@@ -60,16 +48,8 @@ MainWindow::MainWindow(QWidget *parent)
     shadowEffect->setXOffset(0);
     shadowEffect->setYOffset(5);
     shadowEffect->setColor(QColor(0, 0, 0, 50));
+    ui->dynamicModeButton->setGraphicsEffect(shadowEffect);
 
-    ui->powersaverButton->setGraphicsEffect(shadowEffect);
-    ui->balancedButton->setGraphicsEffect(shadowEffect);
-    ui->highPerformanceButton->setGraphicsEffect(shadowEffect);
-    ui->manualButton->setGraphicsEffect(shadowEffect);
-    ui->automaticButton->setGraphicsEffect(shadowEffect);
-    ui->terminateProcessButton->setGraphicsEffect(shadowEffect);
-    ui->listProcessesButton->setGraphicsEffect(shadowEffect);
-    ui->turboModeButton->setGraphicsEffect(shadowEffect);
-    ui->normalModeButton->setGraphicsEffect(shadowEffect);
     DWORD currentBrightness;
     if (GetExternalMonitorBrightness(currentBrightness)) {
         ui->brightnessSlider->setValue(currentBrightness);
@@ -330,7 +310,7 @@ void MainWindow::on_normalModeButton_clicked() {
 
     lastClickTime = now;
     qDebug() << "Normal Mode Button Clicked. Current state:" << monitoringActive;
-
+    currentMode = Mode::Normal;
     bool isChecked = ui->normalModeButton->isChecked();
 
 
@@ -383,7 +363,7 @@ void MainWindow::on_turboModeButton_clicked() {
     lastClickTime = now;
     qDebug() << "Turbo Mode Button Clicked. Current state:" << monitoringActive;
 
-
+    currentMode = Mode::Turbo;
 
     bool isChecked = ui->turboModeButton->isChecked();
 
@@ -415,17 +395,81 @@ void MainWindow::on_turboModeButton_clicked() {
     updatePowerPlanLabel(); // Ensure the power plan label is updated accordingly
 }
 
+void MainWindow::on_dynamicModeButton_clicked() {
+    static QDateTime lastClickTime;
+    QDateTime now = QDateTime::currentDateTime();
+
+    if (lastClickTime.isValid() && lastClickTime.msecsTo(now) < 500) { // 500 ms threshold
+        qDebug() << "Ignoring rapid second click.";
+        return;
+    }
+
+    lastClickTime = now;
+    currentMode = Mode::Dynamic;
+    bool isChecked = ui->dynamicModeButton->isChecked();
+    if (isChecked && !monitoringActive) {
+        prioritycheckbox->setEnabled(false);
+        ui->normalModeButton->setEnabled(false); // Disable normal mode button
+        ui->turboModeButton->setEnabled(false);
+        // Start monitoring
+        if(prioritycheckbox->isChecked()){
+            qDebug() << "prioritycheckbox CHECKED";
+        }
+        // Check the current power source and decide the mode
+        if (powerManager->isOnBatteryPower()) {
+            emit startNormalModeSignal(prioritycheckbox->isChecked());
+        } else {
+            emit startTurboModeSignal(prioritycheckbox->isChecked());
+        }
+        monitoringActive = true;
+        logMessageAutomatic("Dynamic Mode Activated.");
+    } else if (!isChecked && monitoringActive) {
+        prioritycheckbox->setEnabled(true);
+        ui->normalModeButton->setEnabled(true); // Re-enable normal mode button
+        ui->turboModeButton->setEnabled(true);
+        // Stop monitoring
+        emit stopMonitoringSignal();
+        logMessageAutomatic("Monitoring stopped.");
+        monitoringActive = false; // Ensure the monitoringActive state is correctly updated
+    }
+}
+void MainWindow::updateButtonStyles() {
+    // Reset all buttons to default style
+    ui->normalModeButton->setStyleSheet("");
+    ui->turboModeButton->setStyleSheet("");
+    // Then highlight the current mode
+    switch (currentMode) {
+    case Mode::Normal:
+        ui->normalModeButton->setStyleSheet("QPushButton { border: 4px solid green; }");
+        break;
+    case Mode::Turbo:
+        ui->turboModeButton->setStyleSheet("QPushButton { border: 4px solid green; }");
+        break;
+    case Mode::Dynamic:
+        // Optionally style the dynamic mode button
+        break;
+    }
+}
 // Define the slot in MainWindow:
 void MainWindow::powerSourceChangedToAC() {
-    if (!acPowerSourceChangeHandled) {
-        QMessageBox::warning(this, tr("Power Source Changed"),
-                             tr("Monitoring has been stopped because the power source changed to AC power."));
-        emit stopMonitoringSignal(); // Stop monitoring
-        acPowerSourceChangeHandled = true; // Ensure this block runs only once per AC connection event
-        logMessageAutomatic("Monitoring stopped.");
-        ui->normalModeButton->setStyleSheet(""); // Reset to default style
-        monitoringActive = false; // Ensure the monitoringActive state is correctly updated
+    // This will handle the change in power source
+    if (currentMode == Mode::Dynamic) {
+        if (powerManager->isOnBatteryPower()) {
+            qDebug() << "Switched to battery, switching to Normal Mode";
+            emit startNormalModeSignal(prioritycheckbox->isChecked());
+        } else {
+            qDebug() << "Switched to AC, switching to Turbo Mode";
+            emit startTurboModeSignal(prioritycheckbox->isChecked());
+        }
+    } else if (!acPowerSourceChangeHandled) {
+        QMessageBox::warning(this, tr("Power Source Changed"), tr("Monitoring has been stopped because the power source changed."));
+        emit stopMonitoringSignal();
+        acPowerSourceChangeHandled = true;
+        updateButtonStyles();
+        monitoringActive = false;
         prioritycheckbox->setEnabled(true);
+        // Re-evaluate the power mode after stopping the monitoring
+        powerManager->stopMonitoringAndRestart();
     }
 }
 
