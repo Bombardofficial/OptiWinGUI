@@ -73,5 +73,6 @@ private:
     PowerMonitoringManager* powerMonitoringManager;
     bool acPowerSourceChangeHandled = false;
     void updateButtonStyles();
+    void updatePowerPlanButtons();
 };
 #endif // MAINWINDOW_H

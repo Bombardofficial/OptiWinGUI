@@ -1,12 +1,12 @@
 #include "brightness_control.h"
-#include <iostream>
+
 #include <comdef.h> // for _com_error
+
 #include <Wbemidl.h>
 
 //#pragma comment(lib, "wbemuuid.lib")
 
 // Helper function to initialize COM and set security
-
 
 bool SetExternalMonitorBrightness(DWORD brightness) {
     DWORD cPhysicalMonitors = 0;
@@ -15,7 +15,7 @@ bool SetExternalMonitorBrightness(DWORD brightness) {
 
     HMONITOR hMonitor = MonitorFromWindow(GetDesktopWindow(), MONITOR_DEFAULTTOPRIMARY);
 
-    if (GetNumberOfPhysicalMonitorsFromHMONITOR(hMonitor, &cPhysicalMonitors)) {
+    if (GetNumberOfPhysicalMonitorsFromHMONITOR(hMonitor, & cPhysicalMonitors)) {
         pPhysicalMonitors = new PHYSICAL_MONITOR[cPhysicalMonitors];
 
         if (GetPhysicalMonitorsFromHMONITOR(hMonitor, cPhysicalMonitors, pPhysicalMonitors)) {
@@ -30,7 +30,7 @@ bool SetExternalMonitorBrightness(DWORD brightness) {
 
     return bSuccess != 0;
 }
-bool GetExternalMonitorBrightness(DWORD &currentBrightness) {
+bool GetExternalMonitorBrightness(DWORD & currentBrightness) {
     DWORD cPhysicalMonitors = 0;
     LPPHYSICAL_MONITOR pPhysicalMonitors = nullptr;
     BOOL bSuccess = FALSE;
@@ -39,14 +39,14 @@ bool GetExternalMonitorBrightness(DWORD &currentBrightness) {
     HMONITOR hMonitor = MonitorFromWindow(GetDesktopWindow(), MONITOR_DEFAULTTOPRIMARY);
 
     // Retrieve the number of physical monitors.
-    if (GetNumberOfPhysicalMonitorsFromHMONITOR(hMonitor, &cPhysicalMonitors) && cPhysicalMonitors > 0) {
+    if (GetNumberOfPhysicalMonitorsFromHMONITOR(hMonitor, & cPhysicalMonitors) && cPhysicalMonitors > 0) {
         pPhysicalMonitors = new PHYSICAL_MONITOR[cPhysicalMonitors];
 
         // Retrieve the physical monitors
         if (GetPhysicalMonitorsFromHMONITOR(hMonitor, cPhysicalMonitors, pPhysicalMonitors)) {
             DWORD minBrightness, maxBrightness;
             // Assuming you're only interested in the first monitor
-            bSuccess = GetMonitorBrightness(pPhysicalMonitors[0].hPhysicalMonitor, &minBrightness, &currentBrightness, &maxBrightness);
+            bSuccess = GetMonitorBrightness(pPhysicalMonitors[0].hPhysicalMonitor, & minBrightness, & currentBrightness, & maxBrightness);
 
             // Cleanup
             DestroyPhysicalMonitors(cPhysicalMonitors, pPhysicalMonitors);

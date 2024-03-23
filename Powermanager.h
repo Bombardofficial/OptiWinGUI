@@ -34,6 +34,7 @@ public:
     bool isOnBatteryPower();
     void startMonitoringBasedOnPowerSource();
     void stopMonitoringAndRestart();
+
 signals:
     void logMessageAutomatic(QString message);
     void monitoringStarted();
@@ -83,6 +84,7 @@ private:
     QString priorityToString(DWORD priorityClass);
     DWORD determinePriorityBasedOnUsage(SIZE_T memoryUsageMB, double cpuUsagePercent);
     bool dynamicOptimizationEnabled;
+    void reduceBackgroundProcessPriorities();
 };
 
 #endif // POWERMANAGER_H

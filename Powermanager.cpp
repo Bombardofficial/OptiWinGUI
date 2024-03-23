@@ -1,35 +1,46 @@
 #include "PowerManager.h"
+
 #include <windows.h>
+
 #include <iostream>
+
 #include <cstdlib>
+
 #include <mutex>
+
 #include <QDebug>
+
 #include <QProcess>
+
 #include <QRegularExpression>
+
 #include <QStringList>
+
 #include <psapi.h>
+
 #include <QMap>
+
 #include <QMultiMap>
+
 #include "mainwindow.h"
 //priority 120000
 std::mutex consoleMutex;
 
-PowerManager::PowerManager(QObject *parent)
-    : QObject(parent), isTurboMode(false), checkTimer(new QTimer(this)), checkPriorityTimer(new QTimer(this)), menuDisplayed(false),
-    currentPowerPlan(""), idleThreshold(180000), accumulatedIdleTime(0), checkInterval(3000), checkPriorityInterval(60000),powerSaverName("Power saver"),highPerformanceName("High performance"), balancedName("Balanced"), monitoringActive(false) {
+PowerManager::PowerManager(QObject * parent): QObject(parent), isTurboMode(false), checkTimer(new QTimer(this)), checkPriorityTimer(new QTimer(this)), menuDisplayed(false),
+    currentPowerPlan(""), idleThreshold(180000), accumulatedIdleTime(0), checkInterval(3000), checkPriorityInterval(60000), powerSaverName("Power saver"), highPerformanceName("High performance"), balancedName("Balanced"), monitoringActive(false) {
 
-    connect(checkTimer, &QTimer::timeout, this, &PowerManager::checkIdleAndSwitchPlan);
-    connect(checkPriorityTimer, &QTimer::timeout, this, &PowerManager::checkAndAdjustProcessPriorities); // Additional connection for resource check
-    connect(this, &PowerManager::requestPriorityAdjustment, this, &PowerManager::adjustPrioritySlot, Qt::QueuedConnection);
+    connect(checkTimer, & QTimer::timeout, this, & PowerManager::checkIdleAndSwitchPlan);
+    connect(checkPriorityTimer, & QTimer::timeout, this, & PowerManager::checkAndAdjustProcessPriorities); // Additional connection for resource check
+    connect(this, & PowerManager::requestPriorityAdjustment, this, & PowerManager::adjustPrioritySlot, Qt::QueuedConnection);
 }
 PowerManager::~PowerManager() {
     if (checkTimer) {
-        checkTimer->stop();
+        checkTimer -> stop();
         delete checkTimer;
         checkTimer = nullptr;
     }
     if (checkPriorityTimer) {
-        checkPriorityTimer->stop();
+        checkPriorityTimer -> stop();
         delete checkPriorityTimer;
         checkPriorityTimer = nullptr;
     }
@@ -37,29 +48,30 @@ PowerManager::~PowerManager() {
 }
 void PowerManager::cleanup() {
     // It's safe to stop the timer here because this slot will be called in the correct thread
-    if (checkTimer && checkTimer->isActive()) {
-        checkTimer->stop();
+    if (checkTimer && checkTimer -> isActive()) {
+        checkTimer -> stop();
     }
-    if (checkPriorityTimer && checkPriorityTimer->isActive()) {
-        checkPriorityTimer->stop();
+    if (checkPriorityTimer && checkPriorityTimer -> isActive()) {
+        checkPriorityTimer -> stop();
     }
     // Perform any other necessary cleanup.
 }
+
 
 void PowerManager::initCpuUsage() {
     SYSTEM_INFO sysInfo;
     FILETIME ftime, fsys, fuser;
 
-    GetSystemInfo(&sysInfo);
+    GetSystemInfo( & sysInfo);
     numProcessors = sysInfo.dwNumberOfProcessors;
 
-    GetSystemTimeAsFileTime(&ftime);
-    memcpy(&lastCPU, &ftime, sizeof(FILETIME));
+    GetSystemTimeAsFileTime( & ftime);
+    memcpy( & lastCPU, & ftime, sizeof(FILETIME));
 
     self = GetCurrentProcess();
-    GetProcessTimes(self, &ftime, &ftime, &fsys, &fuser);
-    memcpy(&lastSysCPU, &fsys, sizeof(FILETIME));
-    memcpy(&lastUserCPU, &fuser, sizeof(FILETIME));
+    GetProcessTimes(self, & ftime, & ftime, & fsys, & fuser);
+    memcpy( & lastSysCPU, & fsys, sizeof(FILETIME));
+    memcpy( & lastUserCPU, & fuser, sizeof(FILETIME));
 }
 const double K = 0.5;
 
@@ -68,24 +80,24 @@ double PowerManager::getProcessCpuUsage(HANDLE process, DWORD processID) {
     ULARGE_INTEGER now, sys, user;
     double percent = -1.0;
 
-    GetSystemTimeAsFileTime(&fnow);
-    memcpy(&now, &fnow, sizeof(FILETIME));
+    GetSystemTimeAsFileTime( & fnow);
+    memcpy( & now, & fnow, sizeof(FILETIME));
 
-    if (!GetProcessTimes(process, &ftime, &ftime, &fsys, &fuser)) {
+    if (!GetProcessTimes(process, & ftime, & ftime, & fsys, & fuser)) {
         qDebug() << "Failed to get process times for process ID:" << processID;
         return percent;
     }
 
-    memcpy(&sys, &fsys, sizeof(FILETIME));
-    memcpy(&user, &fuser, sizeof(FILETIME));
+    memcpy( & sys, & fsys, sizeof(FILETIME));
+    memcpy( & user, & fuser, sizeof(FILETIME));
 
-    ProcessCpuTimes& cpuTimes = processCpuTimesMap[processID];
+    ProcessCpuTimes & cpuTimes = processCpuTimesMap[processID];
     unsigned long long sysDiff = sys.QuadPart - cpuTimes.lastSysCPU.QuadPart;
     unsigned long long userDiff = user.QuadPart - cpuTimes.lastUserCPU.QuadPart;
     unsigned long long nowDiff = now.QuadPart - cpuTimes.lastCPU.QuadPart;
 
     if (nowDiff > 0) {
-        double currentUsage = (double)(sysDiff + userDiff) * 100.0 / (double)nowDiff / numProcessors;
+        double currentUsage = (double)(sysDiff + userDiff) * 100.0 / (double) nowDiff / numProcessors;
         if (cpuTimes.previousCpuUsage == 0.0) { // Initial setup with the first actual usage calculation
             cpuTimes.previousCpuUsage = currentUsage;
         }
@@ -139,64 +151,73 @@ QString PowerManager::GetCurrentPowerPlan() {
     return "Unknown"; // Return "Unknown" if we can't find a match
 }
 
-void PowerManager::SetPowerPlan(const std::string& planName) {
+void PowerManager::SetPowerPlan(const std::string & planName) {
     // This function assumes you have power plans with these exact names.
     // The GUIDs are examples and need to be replaced with the actual GUIDs of the power plans.
     if (currentPowerPlan == planName) {
         return; // No need to switch if it's already the selected plan
     }
-    std::string command;
+
+    std::string command = "powercfg /s ";
     if (planName == "Balanced") {
-        command = "powercfg /s SCHEME_BALANCED";
-    }
-    else if (planName == "Power saver") {
-        command = "powercfg /s SCHEME_MAX";
-    }
-    else if (planName == "High performance") {
-        command = "powercfg /s SCHEME_MIN";
-    }
-    else {
+        command += "SCHEME_BALANCED";
+    } else if (planName == "Power saver") {
+        command += "SCHEME_MAX";
+        // Adjust screen and sleep settings for Power saver plan
+        system("powercfg /change monitor-timeout-dc 1"); // Turn off the display after 1 minute on battery
+        system("powercfg /change standby-timeout-dc 10"); // Put the computer to sleep after 10 minutes on battery
+    } else if (planName == "High performance") {
+        command += "SCHEME_MIN";
+        // Adjust screen and sleep settings for High performance plan
+        // Example: setting longer or disabled timeouts
+        system("powercfg /change monitor-timeout-dc 5"); // Adjust as needed
+        system("powercfg /change standby-timeout-dc 20"); // Adjust as needed
+    } else {
         emit logMessageAutomatic(QString("Error: Failed to set power plan to \"%1\". Check system configuration.").arg(QString::fromStdString(planName)));
         return;
     }
 
     system(command.c_str());
+    currentPowerPlan = planName; // Update the currentPowerPlan variable
+    // Optionally log the successful power plan change
+    emit logMessageAutomatic(QString("Power plan changed to \"%1\".").arg(QString::fromStdString(planName)));
 }
 
-
-void PowerManager::switchPowerPlan(const std::string& powerPlanName) {
+void PowerManager::switchPowerPlan(const std::string & powerPlanName) {
     if (currentPowerPlan == powerPlanName) {
         return; // No need to switch if it's already the selected plan
     }
     lastPowerPlan = currentPowerPlan;
-    std::string command;
+    std::string command = "powercfg /s ";
     if (powerPlanName == "Balanced") {
-        command = "powercfg /s SCHEME_BALANCED";
-    }
-    else if (powerPlanName == "Power saver") {
-        command = "powercfg /s SCHEME_MAX";
-    }
-    else if (powerPlanName == "High performance") {
-        command = "powercfg /s SCHEME_MIN";
-    }
-    else {
+        command += "SCHEME_BALANCED";
+    } else if (powerPlanName == "Power saver") {
+        command += "SCHEME_MAX";
+        // Adjust screen and sleep settings for Power saver plan
+        system("powercfg /change monitor-timeout-dc 1"); // Turn off the display after 1 minute on battery
+        system("powercfg /change standby-timeout-dc 10"); // Put the computer to sleep after 10 minutes on battery
+    } else if (powerPlanName == "High performance") {
+        command += "SCHEME_MIN";
+        // Adjust screen and sleep settings for High performance plan
+        // Example: setting longer or disabled timeouts
+        system("powercfg /change monitor-timeout-dc 5"); // Adjust as needed
+        system("powercfg /change standby-timeout-dc 20"); // Adjust as needed
+    } else {
         std::cout << "Power plan \"" << powerPlanName << "\" not recognized." << std::endl;
         return;
     }
+
     int result = system(command.c_str());
     if (result == 0) {
         currentPowerPlan = powerPlanName; // Update the current power plan
-        int maxRefreshRate = displayManager.listSupportedModes().back().second; // Get the maximum refresh rate
-         emit logMessageAutomatic(QString("Successfully switched to %1 plan.").arg(QString::fromStdString(powerPlanName)));
-
+        int maxRefreshRate = displayManager.listSupportedModes().back().second;
         if (powerPlanName == "Balanced" || powerPlanName == "Power saver") {
-            displayManager.setDisplayRefreshRate(60); // Set to 60Hz for Balanced and Power saver
+            displayManager.setDisplayRefreshRate(60); // Set to 60Hz for these plans
+        } else if (powerPlanName == "High performance") {
+            displayManager.setDisplayRefreshRate(maxRefreshRate); // Set to max for High performance
         }
-        else if (powerPlanName == "High performance") {
-            displayManager.setDisplayRefreshRate(maxRefreshRate); // Set to maximum for High performance
-        }
-    }
-    else {
+        emit logMessageAutomatic(QString("Successfully switched to %1 plan. Screen and sleep settings adjusted accordingly.").arg(QString::fromStdString(powerPlanName)));
+    } else {
         emit logMessageAutomatic(QString("Failed to switch to %1 plan.").arg(QString::fromStdString(powerPlanName)));
     }
 }
@@ -210,13 +231,13 @@ bool PowerManager::isSystemIdle() {
     }
     LASTINPUTINFO lastInputInfo;
     lastInputInfo.cbSize = sizeof(LASTINPUTINFO);
-    GetLastInputInfo(&lastInputInfo);
+    GetLastInputInfo( & lastInputInfo);
 
     ULONGLONG currentTime = GetTickCount64();
     long lastInputTime = lastInputInfo.dwTime;
 
     // If there was recent activity, reset accumulated idle time
-    if ((currentTime - lastInputTime) < static_cast<ULONGLONG>(checkInterval)) {
+    if ((currentTime - lastInputTime) < static_cast < ULONGLONG > (checkInterval)) {
         accumulatedIdleTime = 0;
         return false;
     }
@@ -240,11 +261,12 @@ void PowerManager::startNormalModeSlot(bool enableDynamicOptimization) {
             qDebug() << "[Normal Mode] Starting with Dynamic Optimization:" << enableDynamicOptimization;
             if (isOnBatteryPower()) {
                 checkAndAdjustProcessPrioritiesforBattery();
-                checkPriorityTimer->start(checkPriorityInterval);
+                checkPriorityTimer -> start(checkPriorityInterval);
             }
 
         }
-        checkTimer->start(checkInterval);
+        reduceBackgroundProcessPriorities();
+        checkTimer -> start(checkInterval);
         qDebug() << "Normal Mode Monitoring Active with Dynamic Optimization: " << enableDynamicOptimization;
         emit monitoringStarted();
     }
@@ -260,9 +282,9 @@ void PowerManager::startTurboModeSlot(bool enableDynamicOptimization) {
         if (enableDynamicOptimization) {
             qDebug() << "[Turbo Mode] Starting with Dynamic Optimization:" << enableDynamicOptimization;
             checkAndAdjustProcessPriorities();
-            checkPriorityTimer->start(checkPriorityInterval);
+            checkPriorityTimer -> start(checkPriorityInterval);
         }
-        checkTimer->start(checkInterval);
+        checkTimer -> start(checkInterval);
         qDebug() << "Turbo Mode Monitoring Active with Dynamic Optimization: " << enableDynamicOptimization;
         emit monitoringStarted();
     }
@@ -270,7 +292,7 @@ void PowerManager::startTurboModeSlot(bool enableDynamicOptimization) {
 }
 bool PowerManager::isOnBatteryPower() {
     SYSTEM_POWER_STATUS sps;
-    if (GetSystemPowerStatus(&sps)) {
+    if (GetSystemPowerStatus( & sps)) {
         return sps.ACLineStatus == 0; // 0 means running on battery, 1 means plugged in
     }
     return false; // Default to false if unable to get power status
@@ -280,13 +302,13 @@ void PowerManager::checkAndAdjustProcessPrioritiesforBattery() {
     aggregatedCpuUsageMap.clear(); // Clear previous data
     aggregatedMemoryUsageMap.clear(); // Clear previous data
     DWORD processes[1024], bytesNeeded, processesCount;
-    if (!EnumProcesses(processes, sizeof(processes), &bytesNeeded)) {
+    if (!EnumProcesses(processes, sizeof(processes), & bytesNeeded)) {
         qDebug() << "Failed to enumerate processes for battery life optimization.";
         return;
     }
 
     processesCount = bytesNeeded / sizeof(DWORD);
-    QMap<QString, QList<DWORD>> executableProcesses;
+    QMap < QString, QList < DWORD >> executableProcesses;
 
     for (unsigned int i = 0; i < processesCount; i++) {
         HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processes[i]);
@@ -306,7 +328,7 @@ void PowerManager::checkAndAdjustProcessPrioritiesforBattery() {
         aggregatedCpuUsageMap[executableName] += cpuUsage;
 
         PROCESS_MEMORY_COUNTERS pmc;
-        if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
+        if (GetProcessMemoryInfo(hProcess, & pmc, sizeof(pmc))) {
             aggregatedMemoryUsageMap[executableName] += pmc.WorkingSetSize / (1024 * 1024); // Convert to MB
         }
 
@@ -316,19 +338,70 @@ void PowerManager::checkAndAdjustProcessPrioritiesforBattery() {
     }
 
     for (auto it = executableProcesses.begin(); it != executableProcesses.end(); ++it) {
-        const QString &exeName = it.key();
-        const QList<DWORD> &processIds = it.value();
+        const QString & exeName = it.key();
+        const QList < DWORD > & processIds = it.value();
 
         double totalCpuUsage = aggregatedCpuUsageMap[exeName];
         SIZE_T totalMemoryUsage = aggregatedMemoryUsageMap[exeName];
         DWORD newPriority = determinePriorityBasedOnUsage(totalMemoryUsage, totalCpuUsage);
 
-        qDebug() << "Executable: " << exeName << " | Total CPU Usage: " << totalCpuUsage
-                 << "% | Total Memory Usage: " << totalMemoryUsage << "MB | New Priority: " << priorityToString(newPriority);
+        qDebug() << "Executable: " << exeName << " | Total CPU Usage: " << totalCpuUsage <<
+            "% | Total Memory Usage: " << totalMemoryUsage << "MB | New Priority: " << priorityToString(newPriority);
 
-        for (DWORD processID : processIds) {
+        for (DWORD processID: processIds) {
             adjustPrioritySlot(processID, newPriority);
         }
+    }
+}
+
+void PowerManager::reduceBackgroundProcessPriorities() {
+    DWORD aProcesses[1024], cbNeeded, cProcesses;
+    unsigned int i;
+
+    if (!EnumProcesses(aProcesses, sizeof(aProcesses), & cbNeeded)) {
+        return;
+    }
+
+    cProcesses = cbNeeded / sizeof(DWORD);
+
+    for (i = 0; i < cProcesses; i++) {
+        DWORD processID = aProcesses[i];
+        // Open the process with QUERY and SET information privileges
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_SET_INFORMATION, FALSE, processID);
+        if (hProcess == NULL) continue;
+
+        TCHAR szProcessName[MAX_PATH] = TEXT("<unknown>");
+        HMODULE hMod;
+        DWORD cbNeeded;
+
+        // Retrieve the process name
+        if (EnumProcessModules(hProcess, & hMod, sizeof(hMod), & cbNeeded)) {
+            GetModuleBaseName(hProcess, hMod, szProcessName, sizeof(szProcessName) / sizeof(TCHAR));
+        }
+
+        QString processName = QString::fromWCharArray(szProcessName);
+
+        // Skip system and essential processes, and adjust as necessary
+        if (processName.contains("System", Qt::CaseInsensitive) ||
+            processName.contains("svchost", Qt::CaseInsensitive) ||
+            processName.contains("explorer.exe", Qt::CaseInsensitive)) {
+            CloseHandle(hProcess);
+            continue;
+        }
+
+        // Retrieve current priority class of the process
+        DWORD currentPriority = GetPriorityClass(hProcess);
+        if (currentPriority == BELOW_NORMAL_PRIORITY_CLASS || currentPriority == IDLE_PRIORITY_CLASS) {
+            // If already set to BELOW_NORMAL or IDLE, no action needed
+            qDebug() << "[Info] Process ID:" << processID << " is already at or below desired priority.";
+            CloseHandle(hProcess);
+            continue;
+        }
+
+        // Otherwise, reduce priority to BELOW_NORMAL
+        SetPriorityClass(hProcess, BELOW_NORMAL_PRIORITY_CLASS);
+
+        CloseHandle(hProcess);
     }
 }
 
@@ -337,13 +410,13 @@ void PowerManager::checkAndAdjustProcessPriorities() {
     aggregatedMemoryUsageMap.clear(); // Clear previous data
 
     DWORD processes[1024], bytesNeeded, processesCount;
-    if (!EnumProcesses(processes, sizeof(processes), &bytesNeeded)) {
+    if (!EnumProcesses(processes, sizeof(processes), & bytesNeeded)) {
         qDebug() << "Failed to enumerate processes.";
         return;
     }
 
     processesCount = bytesNeeded / sizeof(DWORD);
-    QMap<QString, QList<DWORD>> executableProcesses; // Map from executable name to list of process IDs
+    QMap < QString, QList < DWORD >> executableProcesses; // Map from executable name to list of process IDs
 
     for (unsigned int i = 0; i < processesCount; i++) {
         HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processes[i]);
@@ -363,7 +436,7 @@ void PowerManager::checkAndAdjustProcessPriorities() {
         aggregatedCpuUsageMap[executableName] += cpuUsage;
 
         PROCESS_MEMORY_COUNTERS pmc;
-        if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
+        if (GetProcessMemoryInfo(hProcess, & pmc, sizeof(pmc))) {
             aggregatedMemoryUsageMap[executableName] += pmc.WorkingSetSize / (1024 * 1024); // Convert to MB
         }
 
@@ -373,28 +446,27 @@ void PowerManager::checkAndAdjustProcessPriorities() {
     }
 
     for (auto it = executableProcesses.begin(); it != executableProcesses.end(); ++it) {
-        const QString &exeName = it.key();
-        const QList<DWORD> &processIds = it.value();
+        const QString & exeName = it.key();
+        const QList < DWORD > & processIds = it.value();
 
         double totalCpuUsage = aggregatedCpuUsageMap[exeName];
         SIZE_T totalMemoryUsage = aggregatedMemoryUsageMap[exeName];
         DWORD newPriority = determinePriorityBasedOnUsage(totalMemoryUsage, totalCpuUsage);
 
-        qDebug() << "Executable: " << exeName << " | Total CPU Usage: " << totalCpuUsage
-                 << "% | Total Memory Usage: " << totalMemoryUsage << "MB | New Priority: " << priorityToString(newPriority);
+        qDebug() << "Executable: " << exeName << " | Total CPU Usage: " << totalCpuUsage <<
+            "% | Total Memory Usage: " << totalMemoryUsage << "MB | New Priority: " << priorityToString(newPriority);
 
-        for (DWORD processID : processIds) {
+        for (DWORD processID: processIds) {
             adjustPrioritySlot(processID, newPriority);
         }
     }
 }
 
-
 // Helper function to determine the new priority based on memory usage and current priority
 DWORD PowerManager::determinePriorityBasedOnUsage(SIZE_T memoryUsageMB, double cpuUsagePercent) {
     bool isIdle = isSystemIdle();
 
-    if(!isOnBatteryPower()){
+    if (!isOnBatteryPower()) {
         // Example logic: adjust these thresholds based on your needs
         if (cpuUsagePercent > 20 || memoryUsageMB > 2000) {
             return ABOVE_NORMAL_PRIORITY_CLASS;
@@ -403,11 +475,9 @@ DWORD PowerManager::determinePriorityBasedOnUsage(SIZE_T memoryUsageMB, double c
         } else {
             return NORMAL_PRIORITY_CLASS;
         }
-    }
-    else if(isIdle) {
+    } else if (isIdle) {
         return BELOW_NORMAL_PRIORITY_CLASS;
-    }
-    else {
+    } else {
         if (cpuUsagePercent < 10 || memoryUsageMB < 1000) {
             return BELOW_NORMAL_PRIORITY_CLASS;
         } else if (cpuUsagePercent > 20 || memoryUsageMB > 2000) {
@@ -421,13 +491,20 @@ DWORD PowerManager::determinePriorityBasedOnUsage(SIZE_T memoryUsageMB, double c
 // Helper function to convert priority class to string for logging purposes
 QString PowerManager::priorityToString(DWORD priorityClass) {
     switch (priorityClass) {
-    case IDLE_PRIORITY_CLASS: return "IDLE";
-    case BELOW_NORMAL_PRIORITY_CLASS: return "BELOW_NORMAL";
-    case NORMAL_PRIORITY_CLASS: return "NORMAL";
-    case ABOVE_NORMAL_PRIORITY_CLASS: return "ABOVE_NORMAL";
-    case HIGH_PRIORITY_CLASS: return "HIGH";
-    case REALTIME_PRIORITY_CLASS: return "REALTIME";
-    default: return "UNKNOWN";
+    case IDLE_PRIORITY_CLASS:
+        return "IDLE";
+    case BELOW_NORMAL_PRIORITY_CLASS:
+        return "BELOW_NORMAL";
+    case NORMAL_PRIORITY_CLASS:
+        return "NORMAL";
+    case ABOVE_NORMAL_PRIORITY_CLASS:
+        return "ABOVE_NORMAL";
+    case HIGH_PRIORITY_CLASS:
+        return "HIGH";
+    case REALTIME_PRIORITY_CLASS:
+        return "REALTIME";
+    default:
+        return "UNKNOWN";
     }
 }
 
@@ -465,11 +542,11 @@ void PowerManager::stopMonitoringSlot() {
     qDebug() << "Stopping Monitoring";
     if (monitoringActive) {
         // Stop the regular monitoring timer
-        checkTimer->stop();
+        checkTimer -> stop();
 
         // Also stop the priority check timer to cease priority adjustments
-        if (checkPriorityTimer->isActive()) {
-            checkPriorityTimer->stop();
+        if (checkPriorityTimer -> isActive()) {
+            checkPriorityTimer -> stop();
             qDebug() << "Priority optimization stopped.";
 
             restorePriorities(); // Restore the original priorities of any adjusted processes
@@ -489,6 +566,11 @@ void PowerManager::checkIdleAndSwitchPlan() {
     bool isIdle = isSystemIdle();
     qDebug() << "System Idle Status:" << isIdle << ", Current Power Plan:" << QString::fromStdString(currentPowerPlan);
     std::string previousPowerPlan = currentPowerPlan;
+
+    if (currentMode == Mode::Normal || (currentMode == Mode::Dynamic && (currentPowerPlan == powerSaverName || currentPowerPlan == balancedName))) {
+        reduceBackgroundProcessPriorities();
+    }
+
     if (isOnBatteryPower()) {
         if ((currentMode == Mode::Dynamic || currentMode == Mode::Normal) && !isIdle) {
             switchPowerPlan(balancedName);
@@ -528,7 +610,7 @@ void PowerManager::stopMonitoringAndRestart() {
 
 void PowerManager::restorePriorities() {
     DWORD processes[1024], bytesNeeded, processesCount;
-    if (!EnumProcesses(processes, sizeof(processes), &bytesNeeded)) {
+    if (!EnumProcesses(processes, sizeof(processes), & bytesNeeded)) {
         qDebug() << "Failed to enumerate processes for priority restoration.";
         return;
     }
@@ -545,14 +627,15 @@ void PowerManager::restorePriorities() {
             continue;
         }
 
-        // Check if the process is set to a higher priority than normal, and adjust it back to normal
-        if (currentPriority > NORMAL_PRIORITY_CLASS) {
+        // Reset priority to NORMAL for all processes except those already at NORMAL_PRIORITY_CLASS
+        if (currentPriority != NORMAL_PRIORITY_CLASS) {
             if (!SetPriorityClass(hProcess, NORMAL_PRIORITY_CLASS)) {
                 qDebug() << "Failed to reset priority for process with PID:" << processes[i];
             } else {
                 qDebug() << "Priority reset to NORMAL for process with PID:" << processes[i];
             }
         }
+
         CloseHandle(hProcess);
     }
     qDebug() << "[Restore Priorities] Process priority restoration completed.";
