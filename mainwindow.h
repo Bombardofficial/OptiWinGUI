@@ -16,7 +16,13 @@
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
+enum class Mode {
+    Normal,
+    Turbo,
+    Dynamic
+};
 
+extern Mode currentMode;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -30,11 +36,12 @@ public:
     void animateButton(QPushButton* button);
     void updateMonitoringButtonStyle(QPushButton* button, bool monitoringActive);
     void updateRefreshRateLabel();
-    void updatePowerPlanLabel();
+    //void updatePowerPlanLabel();
 signals:
     void startNormalModeSignal(bool enableDynamicOptimization); // Signal declaration
     void startTurboModeSignal(bool enableDynamicOptimization); // Signal declaration
     void stopMonitoringSignal(); // Signal declaration
+    void darkModeChanged(bool isDarkMode);
 private slots:
     void on_highPerformanceButton_clicked(); // Slot for button click
     void on_balancedButton_clicked(); // Slot for button click
@@ -50,7 +57,8 @@ private slots:
     void on_listProcessesButton_clicked();
     void onOptInToggled(bool checked);
     void powerSourceChangedToAC();
-
+    void on_dynamicModeButton_clicked();
+    void toggleDarkMode(bool checked);
 protected:
     void closeEvent(QCloseEvent *event) override;
 private:
@@ -66,5 +74,8 @@ private:
     QCheckBox *prioritycheckbox;
     PowerMonitoringManager* powerMonitoringManager;
     bool acPowerSourceChangeHandled = false;
+    void updateButtonStyles();
+    void updatePowerPlanButtons();
+    void updatePageButtonStyles();
 };
 #endif // MAINWINDOW_H

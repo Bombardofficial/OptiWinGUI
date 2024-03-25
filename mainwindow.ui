@@ -135,7 +135,7 @@
         <x>280</x>
         <y>530</y>
         <width>711</width>
-        <height>31</height>
+        <height>51</height>
        </rect>
       </property>
       <property name="readOnly">
@@ -162,7 +162,7 @@
       <property name="geometry">
        <rect>
         <x>1010</x>
-        <y>330</y>
+        <y>350</y>
         <width>261</width>
         <height>231</height>
        </rect>
@@ -320,19 +320,6 @@
        <string>Kill Process</string>
       </property>
      </widget>
-     <widget class="QLabel" name="powerplanLabel">
-      <property name="geometry">
-       <rect>
-        <x>610</x>
-        <y>370</y>
-        <width>331</width>
-        <height>31</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-     </widget>
      <widget class="QLabel" name="logomanual">
       <property name="geometry">
        <rect>
@@ -351,10 +338,10 @@
      <widget class="QPushButton" name="normalModeButton">
       <property name="geometry">
        <rect>
-        <x>650</x>
-        <y>250</y>
-        <width>281</width>
-        <height>101</height>
+        <x>10</x>
+        <y>280</y>
+        <width>211</width>
+        <height>51</height>
        </rect>
       </property>
       <property name="font">
@@ -377,10 +364,10 @@
      <widget class="QPushButton" name="turboModeButton">
       <property name="geometry">
        <rect>
-        <x>320</x>
-        <y>250</y>
-        <width>291</width>
-        <height>101</height>
+        <x>10</x>
+        <y>350</y>
+        <width>211</width>
+        <height>51</height>
        </rect>
       </property>
       <property name="font">
@@ -403,10 +390,10 @@
      <widget class="QTextEdit" name="consoleLogViewer_automatic">
       <property name="geometry">
        <rect>
-        <x>260</x>
+        <x>280</x>
         <y>530</y>
         <width>711</width>
-        <height>31</height>
+        <height>51</height>
        </rect>
       </property>
       <property name="readOnly">
@@ -429,52 +416,88 @@
      <widget class="QWidget" name="priorityGroup" native="true">
       <property name="geometry">
        <rect>
-        <x>320</x>
-        <y>360</y>
+        <x>510</x>
+        <y>410</y>
         <width>291</width>
-        <height>141</height>
-       </rect>
-      </property>
-     </widget>
-     <widget class="QPushButton" name="startButton">
-      <property name="geometry">
-       <rect>
-        <x>1080</x>
-        <y>370</y>
-        <width>131</width>
-        <height>41</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>PushButton</string>
-      </property>
-     </widget>
-     <widget class="QComboBox" name="durationComboBox">
-      <property name="geometry">
-       <rect>
-        <x>1080</x>
-        <y>430</y>
-        <width>131</width>
-        <height>28</height>
+        <height>81</height>
        </rect>
       </property>
      </widget>
      <widget class="QLabel" name="statusLabel">
       <property name="geometry">
        <rect>
-        <x>1050</x>
-        <y>480</y>
-        <width>181</width>
-        <height>20</height>
+        <x>560</x>
+        <y>230</y>
+        <width>201</width>
+        <height>31</height>
        </rect>
       </property>
+      <property name="font">
+       <font>
+        <bold>true</bold>
+        <underline>false</underline>
+       </font>
+      </property>
       <property name="text">
-       <string/>
+       <string>Auto-Optimize Mode</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="dynamicModeButton">
+      <property name="geometry">
+       <rect>
+        <x>560</x>
+        <y>280</y>
+        <width>221</width>
+        <height>81</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>10</pointsize>
+        <bold>true</bold>
+        <underline>false</underline>
+       </font>
+      </property>
+      <property name="cursor">
+       <cursorShape>PointingHandCursor</cursorShape>
+      </property>
+      <property name="text">
+       <string>Start</string>
+      </property>
+      <property name="checkable">
+       <bool>true</bool>
       </property>
      </widget>
     </widget>
    </widget>
+   <widget class="QPushButton" name="darkModeToggleButton">
+    <property name="geometry">
+     <rect>
+      <x>1160</x>
+      <y>40</y>
+      <width>111</width>
+      <height>51</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>10</pointsize>
+      <bold>true</bold>
+      <underline>false</underline>
+     </font>
+    </property>
+    <property name="cursor">
+     <cursorShape>PointingHandCursor</cursorShape>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="checkable">
+     <bool>true</bool>
+    </property>
+   </widget>
   </widget>
+  <widget class="QStatusBar" name="statusbar"/>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
@@ -484,29 +507,7 @@
      <height>25</height>
     </rect>
    </property>
-   <widget class="QMenu" name="actionManual">
-    <property name="font">
-     <font>
-      <pointsize>9</pointsize>
-      <italic>false</italic>
-      <bold>false</bold>
-      <underline>false</underline>
-      <strikeout>false</strikeout>
-     </font>
-    </property>
-    <property name="title">
-     <string>Manual</string>
-    </property>
-   </widget>
-   <widget class="QMenu" name="actionAutomatic">
-    <property name="title">
-     <string>Automatic</string>
-    </property>
-   </widget>
-   <addaction name="actionManual"/>
-   <addaction name="actionAutomatic"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources/>
  <connections/>

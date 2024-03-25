@@ -6,6 +6,7 @@
 #include <string>
 #include "DisplayManager.h" // Ensure this is defined elsewhere in your project
 #include "brightness_control.h"
+
 #include <map>
 #include <windows.h>
 
@@ -14,6 +15,7 @@ struct ProcessCpuTimes {
     ULARGE_INTEGER lastUserCPU;
     ULARGE_INTEGER lastCPU;
     double previousCpuUsage = 0.0; // Add this line to store the previous CPU usage
+
 };
 
 class PowerManager : public QObject {
@@ -31,12 +33,16 @@ public:
     void restorePriorities();
     DWORD defaultbrightness;
     bool isOnBatteryPower();
+    void startMonitoringBasedOnPowerSource();
+    void stopMonitoringAndRestart();
+
 signals:
     void logMessageAutomatic(QString message);
     void monitoringStarted();
     void monitoringStopped();
     void requestPriorityAdjustment(DWORD processID, DWORD newPriorityClass);
     void powerSourceChangedToAC();
+
 
 public slots:
     void startNormalModeSlot(bool enableDynamicOptimization);
@@ -54,7 +60,7 @@ private:
     HANDLE self;
     std::unordered_map<QString, double> aggregatedCpuUsageMap;
     std::unordered_map<QString, SIZE_T> aggregatedMemoryUsageMap;
-
+    std::string lastPowerPlan;
     void initCpuUsage();
     double getProcessCpuUsage(HANDLE process, DWORD processID);
     std::map<DWORD, ProcessCpuTimes> processCpuTimesMap;
@@ -79,6 +85,8 @@ private:
     QString priorityToString(DWORD priorityClass);
     DWORD determinePriorityBasedOnUsage(SIZE_T memoryUsageMB, double cpuUsagePercent);
     bool dynamicOptimizationEnabled;
+    void reduceBackgroundProcessPriorities();
+    double calculateCpuUsage(const ProcessCpuTimes& prevCpuTimes, const ULARGE_INTEGER& sys, const ULARGE_INTEGER& user, const ULARGE_INTEGER& now, int numProcessors);
 };
 
 #endif // POWERMANAGER_H

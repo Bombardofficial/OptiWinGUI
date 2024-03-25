@@ -3,6 +3,9 @@
         <file>OptiWinLogo-transparent.png</file>
     </qresource>
     <qresource prefix="/">
+        <file>OptiWinLogo-transparent-white.png</file>
+    </qresource>
+    <qresource prefix="/">
         <file>OptiWinLogo-transparentmain2.ico</file>
     </qresource>
 </RCC>

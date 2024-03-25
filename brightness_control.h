@@ -9,9 +9,9 @@
 
 
 bool SetExternalMonitorBrightness(DWORD brightness);
-bool SetAppropriateMonitorBrightness(DWORD brightness);
 bool GetExternalMonitorBrightness(DWORD &currentBrightness);
-
+bool SetMonitorBrightness(DWORD brightness);
+bool SetInternalMonitorBrightness(DWORD brightness);
 
 
 #endif // BRIGHTNESS_CONTROL_H
