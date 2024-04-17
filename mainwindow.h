@@ -37,11 +37,13 @@ public:
     void updateMonitoringButtonStyle(QPushButton* button, bool monitoringActive);
     void updateRefreshRateLabel();
     //void updatePowerPlanLabel();
+    void applyStyleSheet(const QString& styleSheet);
 signals:
     void startNormalModeSignal(bool enableDynamicOptimization); // Signal declaration
     void startTurboModeSignal(bool enableDynamicOptimization); // Signal declaration
     void stopMonitoringSignal(); // Signal declaration
     void darkModeChanged(bool isDarkMode);
+    void colorVisionChanged(int mode);
 private slots:
     void on_highPerformanceButton_clicked(); // Slot for button click
     void on_balancedButton_clicked(); // Slot for button click
@@ -59,6 +61,9 @@ private slots:
     void powerSourceChangedToAC();
     void on_dynamicModeButton_clicked();
     void toggleDarkMode(bool checked);
+    void updateBrightnessSlider(int newBrightness);
+    void updateRefreshRateComboBox(int newRefreshRate);
+    void applyBrightnessSettings();
 protected:
     void closeEvent(QCloseEvent *event) override;
 private:
@@ -77,5 +82,10 @@ private:
     void updateButtonStyles();
     void updatePowerPlanButtons();
     void updatePageButtonStyles();
+
+    QString normalStyleSheet;
+    QString deuteranopiaStyleSheet;
+    QString protanopiaStyleSheet;
+    QString tritanopiaStyleSheet;
 };
 #endif // MAINWINDOW_H

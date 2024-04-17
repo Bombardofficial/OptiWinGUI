@@ -15,7 +15,9 @@
 
 // Function to set the brightness for internal display
 bool SetInternalMonitorBrightness(DWORD brightness) {
-    if (brightness > 100) brightness = 100; // Check if brightness value is out of range
+
+    if (brightness < 10) brightness = 10;
+    else if (brightness > 100) brightness = 100;
 
     // Set the brightness of the laptop display using PowerShell command
     std::wstring command = L"powershell.exe -Command \"(Get-WmiObject -Namespace root\\wmi -Class WmiMonitorBrightnessMethods).WmiSetBrightness(0," + std::to_wstring(brightness) + L")\"";
@@ -29,12 +31,23 @@ bool SetInternalMonitorBrightness(DWORD brightness) {
     return true; // Return true to indicate success
 }
 
+
 // Wrapper function to set brightness for both external and internal displays
 bool SetMonitorBrightness(DWORD brightness) {
-    bool externalResult = SetExternalMonitorBrightness(brightness);
-    bool internalResult = SetInternalMonitorBrightness(brightness);
+    bool result = false;
+    DWORD currentBrightness;
 
-    return externalResult && internalResult;
+    // First, try to adjust external monitor brightness
+    bool externalResult = SetExternalMonitorBrightness(brightness);
+
+    // If no external monitor is found or adjusted, fall back to the internal monitor
+    if (!externalResult || !GetExternalMonitorBrightness(currentBrightness)) {
+        result = SetInternalMonitorBrightness(brightness);
+    } else {
+        result = externalResult;
+    }
+
+    return result;
 }
 
 

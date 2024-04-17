@@ -468,6 +468,151 @@
        <bool>true</bool>
       </property>
      </widget>
+     <widget class="QLineEdit" name="lineEditMaxBrightness">
+      <property name="geometry">
+       <rect>
+        <x>1080</x>
+        <y>260</y>
+        <width>113</width>
+        <height>20</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineEditMinBrightness">
+      <property name="geometry">
+       <rect>
+        <x>1080</x>
+        <y>440</y>
+        <width>113</width>
+        <height>20</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="statusLabel_2">
+      <property name="geometry">
+       <rect>
+        <x>1100</x>
+        <y>220</y>
+        <width>201</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <bold>true</bold>
+        <underline>false</underline>
+       </font>
+      </property>
+      <property name="text">
+       <string>Brightness:</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="statusLabel_3">
+      <property name="geometry">
+       <rect>
+        <x>1060</x>
+        <y>400</y>
+        <width>161</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <bold>true</bold>
+        <underline>false</underline>
+       </font>
+      </property>
+      <property name="text">
+       <string>Minimum Brightness:</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="statusLabel_4">
+      <property name="geometry">
+       <rect>
+        <x>1050</x>
+        <y>140</y>
+        <width>201</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>11</pointsize>
+        <bold>true</bold>
+        <underline>false</underline>
+       </font>
+      </property>
+      <property name="text">
+       <string>Monitoring settings</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineEditMaxBatteryBrightness">
+      <property name="geometry">
+       <rect>
+        <x>1080</x>
+        <y>370</y>
+        <width>113</width>
+        <height>20</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="statusLabel_5">
+      <property name="geometry">
+       <rect>
+        <x>1060</x>
+        <y>330</y>
+        <width>161</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <bold>true</bold>
+        <underline>false</underline>
+       </font>
+      </property>
+      <property name="text">
+       <string>Maximum Brightness:</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="statusLabel_6">
+      <property name="geometry">
+       <rect>
+        <x>1100</x>
+        <y>180</y>
+        <width>201</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <bold>true</bold>
+        <underline>false</underline>
+       </font>
+      </property>
+      <property name="text">
+       <string>Plugged-in</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="statusLabel_7">
+      <property name="geometry">
+       <rect>
+        <x>1100</x>
+        <y>290</y>
+        <width>201</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <bold>true</bold>
+        <underline>false</underline>
+       </font>
+      </property>
+      <property name="text">
+       <string>On Battery</string>
+      </property>
+     </widget>
     </widget>
    </widget>
    <widget class="QPushButton" name="darkModeToggleButton">

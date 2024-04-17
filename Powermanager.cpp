@@ -26,8 +26,10 @@
 //priority 120000
 std::mutex consoleMutex;
 
-PowerManager::PowerManager(QObject * parent): QObject(parent), isTurboMode(false), checkTimer(new QTimer(this)), checkPriorityTimer(new QTimer(this)), menuDisplayed(false),
-    currentPowerPlan(""), idleThreshold(180000), accumulatedIdleTime(0), checkInterval(3000), checkPriorityInterval(3000), powerSaverName("Power saver"), highPerformanceName("High performance"), balancedName("Balanced"), monitoringActive(false) {
+PowerManager::PowerManager(QObject * parent): QObject(parent), isTurboMode(false), defaultbrightness(75), minBrightness(30), normalBrightness(50),
+    checkTimer(new QTimer(this)), checkPriorityTimer(new QTimer(this)), menuDisplayed(false), currentPowerPlan(""), idleThreshold(180000), accumulatedIdleTime(0), checkInterval(3000), checkPriorityInterval(3000), powerSaverName("Power saver"),highPerformanceName("High performance"), // Default brightness
+    balancedName("Balanced"), // Minimum brightness
+    monitoringActive(false) {
 
     connect(checkTimer, & QTimer::timeout, this, & PowerManager::checkIdleAndSwitchPlan);
     connect(checkPriorityTimer, & QTimer::timeout, this, & PowerManager::checkAndAdjustProcessPriorities); // Additional connection for resource check
@@ -73,7 +75,6 @@ void PowerManager::initCpuUsage() {
     memcpy( & lastSysCPU, & fsys, sizeof(FILETIME));
     memcpy( & lastUserCPU, & fuser, sizeof(FILETIME));
 }
-const double K = 0.5;
 
 double PowerManager::getProcessCpuUsage(HANDLE process, DWORD processID) {
     FILETIME now, sys, user, ftime;
@@ -210,6 +211,7 @@ void PowerManager::SetPowerPlan(const std::string & planName) {
     currentPowerPlan = planName; // Update the currentPowerPlan variable
     // Optionally log the successful power plan change
     emit logMessageAutomatic(QString("Power plan changed to \"%1\".").arg(QString::fromStdString(planName)));
+    emit powerPlanChanged();
 }
 
 void PowerManager::switchPowerPlan(const std::string & powerPlanName) {
@@ -242,8 +244,10 @@ void PowerManager::switchPowerPlan(const std::string & powerPlanName) {
         int maxRefreshRate = displayManager.listSupportedModes().back().second;
         if (powerPlanName == "Balanced" || powerPlanName == "Power saver") {
             displayManager.setDisplayRefreshRate(60); // Set to 60Hz for these plans
+            emit refreshRateChanged(60);
         } else if (powerPlanName == "High performance") {
             displayManager.setDisplayRefreshRate(maxRefreshRate); // Set to max for High performance
+            emit refreshRateChanged(maxRefreshRate);
         }
         emit logMessageAutomatic(QString("Successfully switched to %1 plan. Screen and sleep settings adjusted accordingly.").arg(QString::fromStdString(powerPlanName)));
     } else {
@@ -283,7 +287,8 @@ void PowerManager::setMenuDisplayed(bool displayed) {
 void PowerManager::startNormalModeSlot(bool enableDynamicOptimization) {
     isTurboMode = false;
     dynamicOptimizationEnabled = enableDynamicOptimization;
-    SetMonitorBrightness(defaultbrightness);
+    //SetMonitorBrightness(normalBrightness);
+    emit brightnessChanged(normalBrightness);
     if (!monitoringActive) {
         monitoringActive = true;
         if (enableDynamicOptimization) {
@@ -304,8 +309,8 @@ void PowerManager::startNormalModeSlot(bool enableDynamicOptimization) {
 void PowerManager::startTurboModeSlot(bool enableDynamicOptimization) {
     isTurboMode = true;
     dynamicOptimizationEnabled = enableDynamicOptimization;
-    SetMonitorBrightness(defaultbrightness); // Example brightness adjustment for Turbo Mode
-
+    //SetMonitorBrightness(defaultbrightness); // Example brightness adjustment for Turbo Mode
+    emit brightnessChanged(defaultbrightness);
     if (!monitoringActive) {
         monitoringActive = true;
         if (enableDynamicOptimization) {
@@ -351,7 +356,6 @@ void PowerManager::checkAndAdjustProcessPrioritiesforBattery() {
         QString executablePath = QString::fromWCharArray(processPath);
         if (executablePath.startsWith("C:\\Windows\\System32", Qt::CaseInsensitive) ||
             (executablePath.startsWith("C:\\Windows\\", Qt::CaseInsensitive) && !executablePath.contains("\\Windows\\SystemApps\\"))) {
-            // This is likely a system process, skip adjustments
             continue;
         }
         aggregatedCpuUsageMap[executableName] += cpuUsage;
@@ -373,8 +377,6 @@ void PowerManager::checkAndAdjustProcessPrioritiesforBattery() {
         double totalCpuUsage = aggregatedCpuUsageMap[exeName];
         SIZE_T totalMemoryUsage = aggregatedMemoryUsageMap[exeName];
         DWORD newPriority = determinePriorityBasedOnUsage(totalMemoryUsage, totalCpuUsage);
-
-        //qDebug() << "Executable: " << exeName << " | Total CPU Usage: " << totalCpuUsage << "% | Total Memory Usage: " << totalMemoryUsage << "MB | New Priority: " << priorityToString(newPriority);
 
         for (DWORD processID: processIds) {
             adjustPrioritySlot(processID, newPriority);
@@ -457,7 +459,7 @@ void PowerManager::checkAndAdjustProcessPriorities() {
         QString executablePath = QString::fromWCharArray(processPath);
         if (executablePath.startsWith("C:\\Windows\\System32", Qt::CaseInsensitive) ||
             (executablePath.startsWith("C:\\Windows\\", Qt::CaseInsensitive) && !executablePath.contains("\\Windows\\SystemApps\\"))) {
-            // This is likely a system process, skip adjustments
+
             continue;
         }
         aggregatedCpuUsageMap[executableName] += cpuUsage;
@@ -479,8 +481,6 @@ void PowerManager::checkAndAdjustProcessPriorities() {
         double totalCpuUsage = aggregatedCpuUsageMap[exeName];
         SIZE_T totalMemoryUsage = aggregatedMemoryUsageMap[exeName];
         DWORD newPriority = determinePriorityBasedOnUsage(totalMemoryUsage, totalCpuUsage);
-
-        //qDebug() << "Executable: " << exeName << " | Total CPU Usage: " << totalCpuUsage << "% | Total Memory Usage: " << totalMemoryUsage << "MB | New Priority: " << priorityToString(newPriority);
 
         for (DWORD processID: processIds) {
             adjustPrioritySlot(processID, newPriority);
@@ -576,7 +576,8 @@ void PowerManager::stopMonitoringSlot() {
         }
 
         monitoringActive = false;
-        SetMonitorBrightness(defaultbrightness); // Reset brightness to default
+        //SetMonitorBrightness(defaultbrightness); // Reset brightness to default
+        emit brightnessChanged(defaultbrightness);
         qDebug() << "Monitoring Stopped";
     }
 
@@ -585,7 +586,9 @@ void PowerManager::stopMonitoringSlot() {
 
 void PowerManager::checkIdleAndSwitchPlan() {
     //qDebug() << "Checking system idle status and adjusting power plan accordingly.";
-
+    qDebug() << minBrightness;
+    qDebug() << defaultbrightness;
+    qDebug() << normalBrightness;
     bool isIdle = isSystemIdle();
     //qDebug() << "System Idle Status:" << isIdle << ", Current Power Plan:" << QString::fromStdString(currentPowerPlan);
     std::string previousPowerPlan = currentPowerPlan;
@@ -597,16 +600,19 @@ void PowerManager::checkIdleAndSwitchPlan() {
     if (isOnBatteryPower()) {
         if ((currentMode == Mode::Dynamic || currentMode == Mode::Normal) && !isIdle) {
             switchPowerPlan(powerSaverName);
-            SetMonitorBrightness(defaultbrightness);
+            //SetMonitorBrightness(normalBrightness);
+            emit brightnessChanged(normalBrightness);
         } else if (isIdle) {
             qDebug() << "Switching to Power Saver due to idle status.";
             switchPowerPlan(powerSaverName);
-            SetMonitorBrightness(30);
+            //SetMonitorBrightness(minBrightness);
+            emit brightnessChanged(minBrightness);
         }
     } else { // Not on battery power
         if (currentMode == Mode::Dynamic || currentMode == Mode::Turbo) {
             switchPowerPlan(highPerformanceName);
-            SetMonitorBrightness(defaultbrightness);
+            //SetMonitorBrightness(defaultbrightness);
+            emit brightnessChanged(defaultbrightness);
         }
     }
     if ((previousPowerPlan == highPerformanceName && currentPowerPlan == powerSaverName) ||
