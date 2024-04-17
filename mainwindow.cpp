@@ -152,8 +152,6 @@ MainWindow::MainWindow(QWidget * parent): QMainWindow(parent), ui(new Ui::MainWi
     connect(prioritycheckbox, & QCheckBox::toggled, this, & MainWindow::onOptInToggled);
     ui->brightnessSlider->setMinimum(10);
 
-
-
 }
 
 MainWindow::~MainWindow() {
