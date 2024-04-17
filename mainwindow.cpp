@@ -152,16 +152,7 @@ MainWindow::MainWindow(QWidget * parent): QMainWindow(parent), ui(new Ui::MainWi
     connect(prioritycheckbox, & QCheckBox::toggled, this, & MainWindow::onOptInToggled);
     ui->brightnessSlider->setMinimum(10);
 
-    QComboBox* colorThemeComboBox = new QComboBox(this);
-    colorThemeComboBox->addItem("Normal Vision", QVariant(0));
-    colorThemeComboBox->addItem("Deuteranopia", QVariant(1));
-    colorThemeComboBox->addItem("Protanopia", QVariant(2));
-    colorThemeComboBox->addItem("Tritanopia", QVariant(3));
 
-    ui->statusbar->addPermanentWidget(colorThemeComboBox); // Adding to the status bar for demonstration
-    connect(colorThemeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index){
-        emit colorVisionChanged(index); // Only emit the signal
-    });
 
 }
 
