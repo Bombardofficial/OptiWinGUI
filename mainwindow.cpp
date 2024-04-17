@@ -142,6 +142,8 @@ MainWindow::MainWindow(QWidget * parent): QMainWindow(parent), ui(new Ui::MainWi
     }
     ui -> priorityGroup -> layout() -> addWidget(prioritycheckbox);
     connect(prioritycheckbox, & QCheckBox::toggled, this, & MainWindow::onOptInToggled);
+    ui->brightnessSlider->setMinimum(10);
+
 
 }
 
