@@ -59,6 +59,9 @@ private slots:
     void powerSourceChangedToAC();
     void on_dynamicModeButton_clicked();
     void toggleDarkMode(bool checked);
+    void updateBrightnessSlider(int newBrightness);
+    void updateRefreshRateComboBox(int newRefreshRate);
+    void applyBrightnessSettings();
 protected:
     void closeEvent(QCloseEvent *event) override;
 private:

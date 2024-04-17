@@ -32,6 +32,8 @@ public:
     QString removeAccents(const QString &input);
     void restorePriorities();
     DWORD defaultbrightness;
+    DWORD minBrightness;
+    DWORD normalBrightness;
     bool isOnBatteryPower();
     void startMonitoringBasedOnPowerSource();
     void stopMonitoringAndRestart();
@@ -42,7 +44,9 @@ signals:
     void monitoringStopped();
     void requestPriorityAdjustment(DWORD processID, DWORD newPriorityClass);
     void powerSourceChangedToAC();
-
+    void brightnessChanged(int newBrightness);
+    void refreshRateChanged(int newRefreshRate);
+    void powerPlanChanged();
 
 public slots:
     void startNormalModeSlot(bool enableDynamicOptimization);

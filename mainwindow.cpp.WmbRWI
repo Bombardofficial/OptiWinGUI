@@ -152,6 +152,21 @@ MainWindow::MainWindow(QWidget * parent): QMainWindow(parent), ui(new Ui::MainWi
     connect(prioritycheckbox, & QCheckBox::toggled, this, & MainWindow::onOptInToggled);
     ui->brightnessSlider->setMinimum(10);
 
+    QComboBox* colorThemeComboBox = new QComboBox(this);
+    colorThemeComboBox->addItem("Normal Vision", QVariant(0));
+    colorThemeComboBox->addItem("Deuteranopia", QVariant(1));
+    colorThemeComboBox->addItem("Protanopia", QVariant(2));
+    colorThemeComboBox->addItem("Tritanopia", QVariant(3));
+
+    ui->statusbar->addPermanentWidget(colorThemeComboBox); // Adding to the status bar for demonstration
+    connect(colorThemeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(updateColorTheme(int)));
+    connect(colorThemeComboBox, SIGNAL(currentIndexChanged(int)), this, SIGNAL(colorVisionChanged(int)));
+    connect(colorThemeComboBox, &QComboBox::currentIndexChanged, this, [this](int index){
+        updateColorTheme(index);
+        emit colorVisionChanged(index);
+    });
+
+    updateColorTheme(0);
 }
 
 MainWindow::~MainWindow() {
@@ -163,6 +178,17 @@ MainWindow::~MainWindow() {
     powerManagerThread -> wait();
     delete powerManager;
     delete ui;
+}
+
+void MainWindow::applyStyleSheet(const QString& styleSheet) {
+    qApp->setStyleSheet(styleSheet);
+}
+
+void MainWindow::updateColorTheme(int index) {
+    qDebug() << "Changing color theme to index:" << index;
+    QString basicStyleSheet = "QWidget { background-color: #f00; }";  // Red background for all widgets
+    qApp->setStyleSheet(basicStyleSheet);
+    emit colorVisionChanged(index);  // Emit the signal
 }
 
 void MainWindow::applyBrightnessSettings() {
