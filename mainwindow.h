@@ -13,6 +13,8 @@
 #include <QCloseEvent>
 #include <QSettings>
 #include <QCheckBox>
+#include <QComboBox>
+#include <QListWidget>
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -80,5 +82,18 @@ private:
     void updateButtonStyles();
     void updatePowerPlanButtons();
     void updatePageButtonStyles();
+    void startDynamicMode(bool withPriorityOptimization);
+    void stopDynamicMode();
+    bool eventFilter(QObject *obj, QEvent *event) override;
+    void setupButton(QPushButton *button, const QString &description);
+    void setupComboBox(QComboBox *comboBox, const QString &boxName);
+    void setupSlider(QSlider *slider, const QString &sliderName);
+    void setupLineEdit(QLineEdit *lineEdit, const QString &lineEditName);
+    void setupCheckBox(QCheckBox *checkBox, const QString &checkBoxName);
+    void setupListWidget(QListWidget *listWidget, const QString &listWidgetName);
+    QTimer speechTimer;
+    QString pendingSpeech;
+    void speakPendingText();
+    void setupSpeechModeCheckbox(QCheckBox *checkBox);
 };
 #endif // MAINWINDOW_H

@@ -13,6 +13,7 @@ SOURCES += \
     PowerMonitoringManager.cpp \
     Powermanager.cpp \
     Processmanager.cpp \
+    accessibilitykeyfilter.cpp \
     brightness_control.cpp \
     main.cpp \
     mainwindow.cpp
@@ -22,6 +23,8 @@ HEADERS += \
     PowerMonitoringManager.h \
     Powermanager.h \
     Processmanager.h \
+    TextToSpeech.h \
+    accessibilitykeyfilter.h \
     brightness_control.h \
     mainwindow.h
 TARGET = OptiWin
@@ -41,6 +44,8 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 LIBS += -lwbemuuid -lDxva2
+LIBS += -lole32 -lsapi
+
 
 RESOURCES += \
     resources.qrc

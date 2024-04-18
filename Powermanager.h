@@ -37,7 +37,7 @@ public:
     bool isOnBatteryPower();
     void startMonitoringBasedOnPowerSource();
     void stopMonitoringAndRestart();
-
+    bool speechModeEnabled;
 signals:
     void logMessageAutomatic(QString message);
     void monitoringStarted();
@@ -91,6 +91,8 @@ private:
     bool dynamicOptimizationEnabled;
     void reduceBackgroundProcessPriorities();
     double calculateCpuUsage(const ProcessCpuTimes& prevCpuTimes, const ULARGE_INTEGER& sys, const ULARGE_INTEGER& user, const ULARGE_INTEGER& now, int numProcessors);
+
+
 };
 
 #endif // POWERMANAGER_H
