@@ -24,7 +24,7 @@
 
 - Adjust display settings: Select your preferred refresh rate and brightness settings in the Display Management section. Changes can be applied immediately and reversed if necessary.
 
-- Manage processes: Use Process Management to view active processes. You can sort by resource usage and terminate any process with a simple click, freeing up valuable system resources.
+- Manage processes: Use Process Management to view active processes. You can terminate any process with a simple click, freeing up valuable system resources.
 ![OptiWinLogo-transparent-white](https://github.com/Bombardofficial/OptiWinGUI/assets/71758740/45218304-337b-4310-9ab1-039d9c9eead1)
 
 
