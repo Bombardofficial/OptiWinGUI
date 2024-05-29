@@ -4,13 +4,14 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <set>
 
 ProcessManager::ProcessManager() {
     // Constructor
 }
 
 std::vector<std::string> ProcessManager::listProcesses() {
-    std::vector<std::string> processList;
+    std::set<std::string> uniqueProcesses; // set to avoid duplicates
     PROCESSENTRY32 entry;
     entry.dwSize = sizeof(PROCESSENTRY32);
 
@@ -19,16 +20,22 @@ std::vector<std::string> ProcessManager::listProcesses() {
     if (Process32First(snapshot, &entry)) {
         do {
             char processName[MAX_PATH];
-            memset(processName, 0, sizeof(processName)); // Zero-initialize the array
+            memset(processName, 0, sizeof(processName));
             size_t convertedChars = 0;
             wcstombs_s(&convertedChars, processName, entry.szExeFile, MAX_PATH);
             processName[MAX_PATH - 1] = '\0'; // Ensure null termination
-            processList.push_back(std::string(processName));
+
+            // Filter out system processes by name or other criteria
+            if (strcmp(processName, "System") != 0 &&
+                strcmp(processName, "svchost.exe") != 0 &&
+                strcmp(processName, "explorer.exe") != 0) {
+                uniqueProcesses.insert(std::string(processName));
+            }
         } while (Process32Next(snapshot, &entry));
     }
 
     CloseHandle(snapshot);
-    return processList;
+    return std::vector<std::string>(uniqueProcesses.begin(), uniqueProcesses.end());
 }
 
 bool ProcessManager::terminateProcess(const std::string& processName) {
@@ -46,10 +53,11 @@ bool ProcessManager::terminateProcess(const std::string& processName) {
             if (strcmp(exeName, processName.c_str()) == 0) {
                 HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, entry.th32ProcessID);
                 if (hProcess != NULL) {
-                    terminated = TerminateProcess(hProcess, 0);
+                    if (TerminateProcess(hProcess, 0)) {
+                        terminated = true; // Mark as terminated if at least one instance is terminated
+                    }
                     CloseHandle(hProcess);
                 }
-                break;
             }
         } while (Process32Next(snapshot, &entry));
     }
