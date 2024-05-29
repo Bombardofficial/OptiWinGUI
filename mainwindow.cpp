@@ -20,10 +20,56 @@
 
 #include <QDebug>
 
+#include "AccessibilityKeyFilter.h"
+
+#include "TextToSpeech.h"
+
 Mode currentMode = Mode::Dynamic;
 MainWindow::MainWindow(QWidget * parent): QMainWindow(parent), ui(new Ui::MainWindow),
     powerManager(new PowerManager()), powerManagerThread(new QThread(this)), monitoringActive(false), powerMonitoringManager(new PowerMonitoringManager(this)) {
     ui -> setupUi(this);
+
+    auto *keyFilter = new AccessibilityKeyFilter(this);
+    installEventFilter(keyFilter);
+
+    connect(keyFilter, &AccessibilityKeyFilter::dynamicModeRequested, this, [this](bool withPriorityOptimization) {
+        if (withPriorityOptimization) {
+            startDynamicMode(true);
+        } else {
+            startDynamicMode(false);
+        }
+    });
+
+    connect(keyFilter, &AccessibilityKeyFilter::stopDynamicModeRequested, this, &MainWindow::stopDynamicMode);
+
+
+    tts = new TextToSpeech();
+    speechTimer.setSingleShot(true);
+    connect(&speechTimer, &QTimer::timeout, this, &MainWindow::speakPendingText);
+    powerManager->speechModeEnabled = false;
+    // Buttons
+    setupButton(ui->manualButton, "Manual Page");
+    setupButton(ui->automaticButton, "Automatic Page");
+    setupButton(ui->powersaverButton, "Power saver Power Plan");
+    setupButton(ui->balancedButton, "Balanced Power Plan");
+    setupButton(ui->highPerformanceButton, "High performance Power Plan");
+    setupButton(ui->listProcessesButton, "List processes");
+    setupButton(ui->terminateProcessButton, "Terminate process");
+    setupButton(ui->normalModeButton, "Optimizing Battery Life mode");
+    setupButton(ui->turboModeButton, "Optimizing Performance mode");
+    setupButton(ui->dynamicModeButton, "Dynamic mode");
+    setupButton(ui->darkModeToggleButton, "Dark theme toggle");
+
+    // Combo Boxes
+    setupComboBox(ui->displayModeComboBox, "Display mode");
+
+    setupSlider(ui->brightnessSlider, "Brightness Slider");
+    setupLineEdit(ui->lineEditMaxBrightness, "Maximum Brightness Field");
+    setupLineEdit(ui->lineEditMinBrightness, "Minimum Brightness Field");
+    setupLineEdit(ui->lineEditMaxBatteryBrightness, "Maximum Battery Brightness Field");
+
+
+
     QSettings settings;
     bool isDarkMode = settings.value("isDarkMode", false).toBool();
 
@@ -152,6 +198,30 @@ MainWindow::MainWindow(QWidget * parent): QMainWindow(parent), ui(new Ui::MainWi
     connect(prioritycheckbox, & QCheckBox::toggled, this, & MainWindow::onOptInToggled);
     ui->brightnessSlider->setMinimum(10);
 
+
+    setupCheckBox(prioritycheckbox, "Process Priority Optimization Checkbox");
+
+    auto *processListWidget = ui->processListWidget;
+    setupListWidget(processListWidget, "Process List Widget");
+
+    QCheckBox *speechModeCheckbox = new QCheckBox(tr("Enable Speech Mode"), this);
+    ui->statusbar->addWidget(speechModeCheckbox);
+    setupSpeechModeCheckbox(speechModeCheckbox);
+
+    speechModeCheckbox->setStyleSheet(R"(
+    QCheckBox {
+        font: bold 12pt; /* larger and bold font */
+        color: black; /* darker text color for better readability */
+        background-color: #fff; /* light background to stand out */
+        padding: 5px; /* space inside the element */
+        margin: 5px; /* space outside the element */
+    }
+    QCheckBox::indicator {
+        width: 20px; /* width of the check box */
+        height: 20px; /* height of the check box */
+    }
+)");
+
 }
 
 MainWindow::~MainWindow() {
@@ -162,8 +232,154 @@ MainWindow::~MainWindow() {
     powerManagerThread -> quit();
     powerManagerThread -> wait();
     delete powerManager;
+    delete tts;
     delete ui;
 }
+
+void MainWindow::setupSpeechModeCheckbox(QCheckBox *checkBox) {
+    connect(checkBox, &QCheckBox::toggled, this, [this](bool checked) {
+        powerManager->speechModeEnabled = checked;
+        qDebug() << "Speech mode is now" << (checked ? "enabled" : "disabled");
+        if(checked){
+            ui -> brightnessSlider -> setValue(30);
+        }
+        else {
+            ui -> brightnessSlider -> setValue(75);
+        }
+        tts->speak(checked ? "Speech mode enabled" : "Speech mode disabled");
+    });
+}
+
+void MainWindow::speakPendingText() {
+    if (powerManager->speechModeEnabled && !pendingSpeech.isEmpty()) {
+        tts->speak(pendingSpeech);
+        pendingSpeech.clear();
+    }
+}
+
+void MainWindow::setupButton(QPushButton *button, const QString &description) {
+    button->setProperty("speechText", description);
+    button->installEventFilter(this);
+
+    connect(button, &QPushButton::clicked, this, [this, button]() {
+        QString speechText = button->property("speechText").toString();
+        if (speechText.isEmpty()) {
+            qDebug() << "Speech text is empty. Fallback to button text.";
+            speechText = button->text();  // Fallback if property not set
+        }
+
+        if (powerManager->speechModeEnabled && tts && tts->isSpeechEnabled()) {
+            tts->speak(speechText + " clicked");
+        }
+    });
+
+}
+
+void MainWindow::setupComboBox(QComboBox *comboBox, const QString &boxName) {
+    comboBox->installEventFilter(this);
+    connect(comboBox, QOverload<int>::of(&QComboBox::activated), [comboBox, boxName, this](int index) {
+        QString itemText = comboBox->itemText(index);
+        if (powerManager->speechModeEnabled && tts && tts->isSpeechEnabled()) {
+            tts->speak(boxName + " set to " + itemText);
+        }
+    });
+    connect(comboBox, QOverload<int>::of(&QComboBox::highlighted), [comboBox, this](int index) {
+        QString itemText = comboBox->itemText(index);
+        if (powerManager->speechModeEnabled && tts && tts->isSpeechEnabled()) {
+            tts->speak(itemText);
+        }
+    });
+}
+void MainWindow::setupSlider(QSlider *slider, const QString &sliderName) {
+    slider->installEventFilter(this);
+    connect(slider, &QSlider::valueChanged, this, [this, slider, sliderName](int value) {
+        if (powerManager->speechModeEnabled && tts && tts->isSpeechEnabled()) {
+            tts->speak(sliderName + " set to " + QString::number(value));
+        }
+    });
+}
+
+void MainWindow::setupLineEdit(QLineEdit *lineEdit, const QString &lineEditName) {
+    lineEdit->installEventFilter(this);
+    connect(lineEdit, &QLineEdit::editingFinished, this, [this, lineEdit, lineEditName]() {
+        if (powerManager->speechModeEnabled && tts && tts->isSpeechEnabled()) {
+            tts->speak(lineEditName + " set to " + lineEdit->text());
+        }
+    });
+}
+
+void MainWindow::setupCheckBox(QCheckBox *checkBox, const QString &checkBoxName) {
+    checkBox->installEventFilter(this);
+    connect(checkBox, &QCheckBox::toggled, this, [this, checkBoxName](bool checked) {
+        QString state = checked ? "checked" : "unchecked";
+        if (powerManager->speechModeEnabled && tts && tts->isSpeechEnabled()) {
+            tts->speak(checkBoxName + " " + state);
+        }
+    });
+}
+
+void MainWindow::setupListWidget(QListWidget *listWidget, const QString &listWidgetName) {
+    listWidget->installEventFilter(this);
+    connect(listWidget, &QListWidget::itemSelectionChanged, this, [this, listWidget, listWidgetName]() {
+        QList<QListWidgetItem *> selectedItems = listWidget->selectedItems();
+        if (!selectedItems.isEmpty()) {
+            QString itemText = selectedItems.first()->text();
+            if (powerManager->speechModeEnabled && tts && tts->isSpeechEnabled()) {
+                tts->speak(itemText + " selected in " +listWidgetName);
+            }
+        }
+    });
+}
+
+bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
+    if (event->type() == QEvent::FocusIn) {
+        if (powerManager->speechModeEnabled && tts && tts->isSpeechEnabled()) {
+            QWidget *widget = qobject_cast<QWidget*>(obj);
+            if (widget) {
+                // Apply focus style only when speech mode is enabled
+                widget->setStyleSheet("QWidget:focus { border: 5px solid #21FC0D; }");
+            }
+            if (speechTimer.isActive()) {
+                speechTimer.stop();
+            }
+
+            if (QPushButton *button = qobject_cast<QPushButton*>(obj)) {
+                QString speechText = button->property("speechText").toString();
+                if (speechText.isEmpty()) {
+                    speechText = button->text();  // Fallback to button text if no speechText set
+                }
+                tts->speak(speechText + " focused");
+            } else if (QSlider *slider = qobject_cast<QSlider*>(obj)) {
+                tts->speak("Brightness slider focused");
+            } else if (QComboBox *comboBox = qobject_cast<QComboBox*>(obj)) {
+                tts->speak("Refresh rate change box focused"); // Assuming you want to speak the currently selected item's text
+            } else if (QLineEdit *lineEdit = qobject_cast<QLineEdit*>(obj)) {
+                QString name = lineEdit->objectName();
+                if (name.contains("MaxBrightness")) {
+                    tts->speak("Maximum Brightness Plugged In Field focused");
+                } else if (name.contains("MinBrightness")) {
+                    tts->speak("Minimum Brightness on battery Field focused");
+                } else if (name.contains("MaxBatteryBrightness")) {
+                    tts->speak("Maximum Battery on battery Brightness Field focused");
+                }
+            } else if (QListWidget *listWidget = qobject_cast<QListWidget*>(obj)) {
+                tts->speak("Process list widget focused");
+            } else if (QCheckBox *checkBox = qobject_cast<QCheckBox*>(obj)) {
+                tts->speak(checkBox->text() + " checkbox focused");
+            }
+            // Add other UI elements here
+            speechTimer.start(100);
+        }
+    } else if (event->type() == QEvent::FocusOut) {
+        QWidget *widget = qobject_cast<QWidget*>(obj);
+        if (widget) {
+            // Reset style when widget loses focus or when speech mode is disabled
+            widget->setStyleSheet("");
+        }
+    }
+    return QMainWindow::eventFilter(obj, event);
+}
+
 
 void MainWindow::applyBrightnessSettings() {
     bool okMax, okMin, okMaxBattery;
@@ -542,6 +758,7 @@ void MainWindow::on_dynamicModeButton_clicked() {
         }
         monitoringActive = true;
         logMessageAutomatic("Dynamic Mode Activated.");
+        ui->dynamicModeButton->setText("STOP");
     } else if (!isChecked && monitoringActive) {
         prioritycheckbox -> setEnabled(true);
         ui -> normalModeButton -> setEnabled(true); // Re-enable normal mode button
@@ -549,6 +766,7 @@ void MainWindow::on_dynamicModeButton_clicked() {
         // Stop monitoring
         emit stopMonitoringSignal();
         logMessageAutomatic("Monitoring stopped.");
+        ui->dynamicModeButton->setText("START");
         monitoringActive = false; // Ensure the monitoringActive state is correctly updated
     }
     updatePowerPlanButtons();
@@ -560,6 +778,43 @@ void MainWindow::on_dynamicModeButton_clicked() {
         ui->dynamicModeButton->setStyleSheet("QPushButton { border: 5px solid #eb1313; }");
     }
 }
+
+void MainWindow::startDynamicMode(bool withPriorityOptimization) {
+    currentMode = Mode::Dynamic;
+    if (!monitoringActive) {
+        ui -> brightnessSlider -> setValue(20);
+
+        prioritycheckbox->setChecked(withPriorityOptimization);
+        prioritycheckbox->setEnabled(false);
+        ui->normalModeButton->setEnabled(false);
+        ui->turboModeButton->setEnabled(false);
+
+        if (powerManager->isOnBatteryPower()) {
+            emit startNormalModeSignal(withPriorityOptimization);
+        } else {
+            emit startTurboModeSignal(withPriorityOptimization);
+        }
+        monitoringActive = true;
+        logMessageAutomatic("Dynamic Mode Activated.");
+        ui->dynamicModeButton->setChecked(true);
+        ui->dynamicModeButton->setStyleSheet("QPushButton { border: 5px solid #13eb7f; }");
+    }
+}
+
+void MainWindow::stopDynamicMode() {
+    if (monitoringActive) {
+        ui -> brightnessSlider -> setValue(powerManager->defaultbrightness);
+        prioritycheckbox->setEnabled(true);
+        ui->normalModeButton->setEnabled(true);
+        ui->turboModeButton->setEnabled(true);
+        emit stopMonitoringSignal();
+        logMessageAutomatic("Monitoring stopped.");
+        monitoringActive = false;
+        ui->dynamicModeButton->setChecked(false);
+        ui->dynamicModeButton->setStyleSheet("QPushButton { border: 5px solid #eb1313; }");
+    }
+}
+
 void MainWindow::updateButtonStyles() {
     // Reset all buttons to default style
     ui -> normalModeButton -> setStyleSheet("");
