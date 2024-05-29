@@ -198,6 +198,7 @@ MainWindow::MainWindow(QWidget * parent): QMainWindow(parent), ui(new Ui::MainWi
     connect(prioritycheckbox, & QCheckBox::toggled, this, & MainWindow::onOptInToggled);
     ui->brightnessSlider->setMinimum(10);
 
+
     setupCheckBox(prioritycheckbox, "Process Priority Optimization Checkbox");
 
     auto *processListWidget = ui->processListWidget;
@@ -220,6 +221,7 @@ MainWindow::MainWindow(QWidget * parent): QMainWindow(parent), ui(new Ui::MainWi
         height: 20px; /* height of the check box */
     }
 )");
+
 }
 
 MainWindow::~MainWindow() {

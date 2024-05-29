@@ -222,4 +222,3 @@ QSlider::handle:horizontal {
     w.show();
     return a.exec();
 }
-
