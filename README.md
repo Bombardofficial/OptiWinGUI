@@ -20,7 +20,7 @@
 
 - Select a page: From the main interface, choose between Manual and Automatic pages. Manual allows you to explore the various features via the dashboard to customise your system settings. In Automatic, configure your preferences once and let **OptiWin** manage optimisations in the background.
 
-- Configure Power Plans: Navigate to the Change Power Plan section to switch between power plans. **OptiWin provides an option for each usage scenario, such as gaming or power saving.
+- Configure Power Plans: Navigate to the Change Power Plan section to switch between power plans. **OptiWin** provides an option for each usage scenario, such as gaming or power saving.
 
 - Adjust display settings: Select your preferred refresh rate and brightness settings in the Display Management section. Changes can be applied immediately and reversed if necessary.
 
